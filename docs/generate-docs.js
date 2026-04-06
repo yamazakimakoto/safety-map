@@ -147,13 +147,14 @@ function createUserManual() {
   children.push(numbered('「新規登録」タブをクリック'));
   children.push(numbered('以下の情報を入力'));
   children.push(bullet('メールアドレス（必須）- 2回入力して一致を確認', 1));
+  children.push(bullet('パスワード（必須）- 6文字以上、2回入力して一致を確認', 1));
   children.push(bullet('表示名（必須）- 投稿時に表示される名前（50文字以内）', 1));
   children.push(bullet('本名（任意）- 管理者のみ閲覧可能', 1));
   children.push(bullet('住所（任意）- 管理者のみ閲覧可能', 1));
   children.push(bullet('電話番号（任意）- 管理者のみ閲覧可能', 1));
   children.push(numbered('「登録する」ボタンをクリック'));
   children.push(space());
-  children.push(p('※ メールアドレスはシステム内で暗号化して保存されます。パスワードは不要で、メールアドレスのみでログインします。', { run: { color: GRAY, size: 20 } }));
+  children.push(p('※ メールアドレスはシステム内で暗号化して保存されます。パスワードはハッシュ化して安全に保存されます。', { run: { color: GRAY, size: 20 } }));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
 
@@ -162,10 +163,20 @@ function createUserManual() {
   children.push(h2('ログイン'));
   children.push(numbered('画面右上の「ログイン」ボタンをクリック'));
   children.push(numbered('登録済みのメールアドレスを入力'));
+  children.push(numbered('パスワードを入力'));
   children.push(numbered('「ログイン」ボタンをクリック'));
   children.push(space());
   children.push(h2('ログアウト'));
   children.push(p('画面右上の「ログアウト」ボタンをクリックするとログアウトします。'));
+  children.push(space());
+  children.push(h2('パスワード変更'));
+  children.push(p('ログイン後、画面右上の「PW変更」ボタンからパスワードを変更できます。'));
+  children.push(numbered('「PW変更」ボタンをクリック'));
+  children.push(numbered('現在のパスワードを入力'));
+  children.push(numbered('新しいパスワード（6文字以上）を入力'));
+  children.push(numbered('「変更する」ボタンをクリック'));
+  children.push(space());
+  children.push(p('※ パスワードを忘れた場合は管理者にリセットを依頼してください。', { run: { color: GRAY, size: 20 } }));
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
 
@@ -184,6 +195,10 @@ function createUserManual() {
     ],
     [2500, 3200, 3200]
   ));
+  children.push(space());
+  children.push(h2('現在位置の表示'));
+  children.push(p('地図左上の📍ボタンをタップすると、GPSで現在地を取得して地図が移動します。青いマーカーと精度範囲の円が表示されます。'));
+  children.push(p('※ 位置情報の利用許可が求められます。スマートフォンの屋外利用で精度が高くなります。', { run: { color: GRAY, size: 20 } }));
   children.push(space());
   children.push(h2('カテゴリーフィルター'));
   children.push(p('画面上部のフィルターバーでカテゴリーを選択すると、そのカテゴリーの投稿のみが表示されます。「すべて」を選ぶと全カテゴリーが表示されます。'));
@@ -287,7 +302,8 @@ function createUserManual() {
   // 10. FAQ
   children.push(h1('10. よくある質問'));
   const faqs = [
-    ['パスワードはありますか？', 'パスワードは不要です。メールアドレスのみでログインします。'],
+    ['パスワードを忘れました', '管理者にパスワードリセットを依頼してください。管理者がパスワードを再設定できます。'],
+    ['パスワードを変更したい', 'ログイン後、画面右上の「PW変更」ボタンから変更できます。'],
     ['写真は何枚添付できますか？', '1つの投稿に最大2枚まで添付できます。後から追加・削除も可能です。'],
     ['投稿の場所を変更できますか？', '場所の変更はできません。投稿を削除して新しい場所で再投稿してください。'],
     ['スマートフォンから使えますか？', 'はい。Safari、Chromeなどのブラウザからアクセスできます。'],
@@ -388,6 +404,9 @@ function createAdminManual() {
   children.push(space());
   children.push(h2('ユーザーの編集'));
   children.push(p('「編集」ボタンから表示名、本名、住所、電話番号を変更できます。'));
+  children.push(space());
+  children.push(h2('ユーザーのパスワードリセット'));
+  children.push(p('「PW」ボタンからユーザーのパスワードを再設定できます。ユーザーがパスワードを忘れた場合に使用します。'));
   children.push(space());
   children.push(h2('ユーザーの削除'));
   children.push(p('「削除」ボタンでユーザーを削除できます。ユーザーの全投稿も同時に削除されます。'));
@@ -639,6 +658,7 @@ function createSpecDoc() {
       ['GET', '/profile', 'x-user-token', 'プロフィール取得'],
       ['PUT', '/profile', 'x-user-token', 'プロフィール更新'],
       ['POST', '/admin/login', 'なし', '管理者ログイン'],
+      ['POST', '/change-password', 'x-user-token', 'ユーザーパスワード変更'],
       ['POST', '/admin/change-password', 'x-admin-token', '管理者パスワード変更'],
     ],
     [1200, 2200, 2000, 3600]
@@ -671,6 +691,7 @@ function createSpecDoc() {
       ['GET', '/users', 'ユーザー一覧（投稿数付き）'],
       ['GET', '/users/:id', 'ユーザー詳細（全投稿付き）'],
       ['PUT', '/users/:id', 'ユーザー編集'],
+      ['PUT', '/users/:id/reset-password', 'ユーザーパスワードリセット'],
       ['DELETE', '/users/:id', 'ユーザー削除（投稿も連鎖削除）'],
       ['GET', '/backup/reports', '投稿CSVエクスポート'],
       ['GET', '/backup/users', 'ユーザーCSVエクスポート'],
@@ -692,7 +713,7 @@ function createSpecDoc() {
   // 5
   children.push(h1('5. セキュリティ'));
   children.push(h2('認証方式'));
-  children.push(bullet('一般ユーザー: メールアドレスベース認証（パスワード不要）'));
+  children.push(bullet('一般ユーザー: メールアドレス + パスワード認証（bcryptハッシュ）'));
   children.push(bullet('管理者: ユーザー名 + パスワード（bcryptハッシュ）'));
   children.push(bullet('セッション管理: UUID v4トークン（localStorageに保存）'));
   children.push(space());
