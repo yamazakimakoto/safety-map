@@ -508,7 +508,7 @@ async function showMyPosts() {
         <div class="report-card" style="cursor:default">
           <div class="report-card-header">
             <span class="report-category-badge" style="background:${color}">${escapeHtml(r.category)}</span>
-            <span class="status-badge status-${r.status}" style="margin-left:6px">${STATUS_LABELS[r.status] || r.status}</span>
+            <span style="background:${ADMIN_STATUS_COLORS[r.admin_status] || '#9E9E9E'};color:white;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:6px">${escapeHtml(r.admin_status || '投稿')}</span>
           </div>
           <div class="report-card-title">${escapeHtml(r.title)}</div>
           <p style="font-size:13px;color:#666;margin:4px 0">${escapeHtml((r.description || '').substring(0, 100))}</p>
