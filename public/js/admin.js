@@ -343,7 +343,7 @@ body{font-family:-apple-system,'Hiragino Sans',sans-serif;color:#333;font-size:1
 </style></head><body>
 <div class="toolbar">
 <button style="background:#1a73e8" onclick="window.print()">印刷</button>
-<button style="background:#999" onclick="window.close()">閉じる</button>
+<button style="background:#999" onclick="location.href='/admin'">戻る</button>
 </div>
 <div class="card">
 <div class="card-header"><h1>街の安全安心マップ - 投稿カード</h1>
@@ -366,10 +366,10 @@ ${r.author_phone?`<div><b>電話:</b>${esc(r.author_phone)}</div>`:''}
 <div class="foot">投稿ID: ${r.id} | 印刷日: ${new Date().toLocaleDateString('ja-JP')}</div>
 </div></body></html>`;
 
-    // Blob URLで新しいタブに開く（Safari対応）
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    // 同じウィンドウ内で印刷ページを表示（Safari対応）
+    document.open();
+    document.write(html);
+    document.close();
   } catch (err) { showToast(err.message, 'error'); }
 }
 
