@@ -17,6 +17,13 @@ const STATUS_LABELS = {
   'resolved': '対応済'
 };
 
+const ADMIN_STATUS_COLORS = {
+  '投稿': '#9E9E9E',
+  '受付': '#2196F3',
+  '対応中': '#FF9800',
+  '解決': '#4CAF50'
+};
+
 // === 状態管理 ===
 let map;
 let markers = L.markerClusterGroup();
@@ -164,6 +171,7 @@ function renderMarkers() {
       <div style="min-width:200px">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
           <span style="background:${color};color:white;padding:1px 8px;border-radius:10px;font-size:11px">${escapeHtml(report.category)}</span>
+          <span style="background:${ADMIN_STATUS_COLORS[report.admin_status] || '#9E9E9E'};color:white;padding:1px 8px;border-radius:10px;font-size:11px">${escapeHtml(report.admin_status || '投稿')}</span>
         </div>
         <strong style="font-size:14px">${escapeHtml(report.title)}</strong>
         ${report.description ? `<p style="font-size:13px;margin:6px 0;color:#555">${escapeHtml(report.description).substring(0, 100)}</p>` : ''}
@@ -196,12 +204,15 @@ function showReportDetail(id) {
     photos += `<img src="${escapeHtml(report.photo2_url)}" style="width:100%;border-radius:8px;margin-bottom:8px">`;
   }
 
+  const adminStatusColor = ADMIN_STATUS_COLORS[report.admin_status] || '#9E9E9E';
+
   body.innerHTML = `
     <div>
       <span class="report-category-badge" style="background:${color}">${escapeHtml(report.category)}</span>
-      <span class="status-badge status-${report.status}" style="margin-left:6px">${STATUS_LABELS[report.status] || report.status}</span>
+      <span style="background:${adminStatusColor};color:white;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:6px">${escapeHtml(report.admin_status || '投稿')}</span>
     </div>
     <h3 style="margin:12px 0 8px;font-size:18px">${escapeHtml(report.title)}</h3>
+    ${report.address ? `<p style="font-size:13px;color:#888;margin-bottom:8px">📍 ${escapeHtml(report.address)}</p>` : ''}
     <p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px">${escapeHtml(report.description || '詳細なし')}</p>
     ${photos}
     <div style="font-size:13px;color:#999;margin-top:12px;padding-top:12px;border-top:1px solid #e0e0e0">

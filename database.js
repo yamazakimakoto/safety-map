@@ -33,9 +33,12 @@ const CREATE_TABLES = `
     category TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
+    address TEXT DEFAULT '',
     photo1_url TEXT DEFAULT '',
     photo2_url TEXT DEFAULT '',
     status TEXT DEFAULT 'published',
+    admin_status TEXT DEFAULT '投稿',
+    admin_memo TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -72,6 +75,11 @@ async function initDatabase() {
 
   await db.exec(CREATE_TABLES);
   await db.exec(CREATE_INDEXES);
+
+  // マイグレーション: reports テーブル拡張
+  try { await db.exec("ALTER TABLE reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+  try { await db.exec("ALTER TABLE reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
+  try { await db.exec("ALTER TABLE reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
 
   // マイグレーション: real_name, address, phone カラム追加
   try { await db.exec("ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}

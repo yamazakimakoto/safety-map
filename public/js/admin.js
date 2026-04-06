@@ -6,6 +6,7 @@ const CATEGORY_COLORS = {
   '環境': '#4CAF50', '交通・道路': '#2196F3', '防犯': '#E91E63', '防災': '#FF9800', 'その他': '#9E9E9E'
 };
 const STATUS_MAP = { published: '公開', hidden: '非公開', resolved: '対応済' };
+const ADMIN_STATUS_COLORS = { '投稿': '#9E9E9E', '受付': '#2196F3', '対応中': '#FF9800', '解決': '#4CAF50' };
 
 document.addEventListener('DOMContentLoaded', () => { if (adminToken) showDashboard(); });
 
@@ -90,13 +91,14 @@ function renderReportsTable(reports) {
   tbody.innerHTML = reports.map(r => `
     <tr>
       <td><span class="report-category-badge" style="background:${CATEGORY_COLORS[r.category]||'#999'}">${esc(r.category)}</span></td>
-      <td><strong>${esc(r.title)}</strong>${r.photo1_url ? ' <span style="color:#999;font-size:11px">[写真]</span>' : ''}</td>
+      <td><strong>${esc(r.title)}</strong>${r.photo1_url ? ' <span style="color:#999;font-size:11px">[写真]</span>' : ''}${r.address ? `<br><span style="font-size:11px;color:#888">${esc(r.address).substring(0,30)}</span>` : ''}</td>
       <td><a href="#" onclick="showAuthorDetail('${r.user_id}');return false" style="color:#1a73e8">${esc(r.author_name)}</a></td>
-      <td><span class="status-badge status-${r.status}">${STATUS_MAP[r.status]||r.status}</span></td>
+      <td><span style="background:${ADMIN_STATUS_COLORS[r.admin_status]||'#9E9E9E'};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${esc(r.admin_status||'投稿')}</span></td>
       <td style="font-size:13px">${fmtDate(r.created_at)}</td>
       <td>
         <div class="admin-actions">
-          <button onclick="openEditModal('${r.id}','${escA(r.category)}','${escA(r.title)}','${escA(r.description||'')}','${r.status}')">編集</button>
+          <button onclick="openEditModal('${r.id}','${escA(r.category)}','${escA(r.title)}','${escA(r.description||'')}','${r.status}','${escA(r.admin_status||'投稿')}','${escA(r.admin_memo||'')}')">編集</button>
+          <button onclick="printReport('${r.id}')">印刷</button>
           <button class="delete" onclick="deleteReport('${r.id}')">削除</button>
         </div>
       </td>
@@ -126,12 +128,14 @@ async function showAuthorDetail(userId) {
 }
 
 // 投稿編集
-function openEditModal(id, category, title, description, status) {
+function openEditModal(id, category, title, description, status, adminStatus, adminMemo) {
   document.getElementById('editId').value = id;
   document.getElementById('editCategory').value = category;
   document.getElementById('editTitle').value = title;
   document.getElementById('editDescription').value = description;
   document.getElementById('editStatus').value = status;
+  document.getElementById('editAdminStatus').value = adminStatus || '投稿';
+  document.getElementById('editAdminMemo').value = adminMemo || '';
   document.getElementById('editModal').classList.remove('hidden');
 }
 
@@ -140,7 +144,7 @@ async function handleEditReport(e) {
   try {
     const res = await fetch(`/api/admin/reports/${document.getElementById('editId').value}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
-      body: JSON.stringify({ category: document.getElementById('editCategory').value, title: document.getElementById('editTitle').value, description: document.getElementById('editDescription').value, status: document.getElementById('editStatus').value })
+      body: JSON.stringify({ category: document.getElementById('editCategory').value, title: document.getElementById('editTitle').value, description: document.getElementById('editDescription').value, status: document.getElementById('editStatus').value, admin_status: document.getElementById('editAdminStatus').value, admin_memo: document.getElementById('editAdminMemo').value })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -286,6 +290,98 @@ async function fetchDownload(url) {
     a.click();
     URL.revokeObjectURL(a.href);
     showToast('ダウンロード完了', 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// === 印刷機能（A4カード） ===
+async function printReport(id) {
+  try {
+    const res = await fetch(`/api/admin/reports/${id}`, { headers: { 'x-admin-token': adminToken } });
+    if (!res.ok) throw new Error('取得エラー');
+    const r = await res.json();
+
+    const color = CATEGORY_COLORS[r.category] || '#999';
+    const adminColor = ADMIN_STATUS_COLORS[r.admin_status] || '#9E9E9E';
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${r.longitude-0.005},${r.latitude-0.003},${r.longitude+0.005},${r.latitude+0.003}&layer=mapnik&marker=${r.latitude},${r.longitude}`;
+    const staticMapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${r.latitude},${r.longitude}&zoom=16&size=400x300&markers=${r.latitude},${r.longitude},lightblue`;
+
+    let photosHtml = '';
+    if (r.photo1_url) photosHtml += `<img src="${r.photo1_url}" style="max-width:48%;max-height:200px;object-fit:cover;border-radius:6px;border:1px solid #ddd">`;
+    if (r.photo2_url) photosHtml += `<img src="${r.photo2_url}" style="max-width:48%;max-height:200px;object-fit:cover;border-radius:6px;border:1px solid #ddd">`;
+
+    const memoSummary = (r.admin_memo || '').substring(0, 300);
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>投稿カード - ${esc(r.title)}</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Hiragino Sans', sans-serif; color: #333; font-size: 11pt; line-height: 1.5; }
+  .card { border: 2px solid #1a73e8; border-radius: 12px; padding: 20px; max-width: 100%; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e0e0e0; }
+  .card-header h1 { font-size: 14pt; color: #1a73e8; }
+  .badges { display: flex; gap: 6px; }
+  .badge { padding: 2px 10px; border-radius: 12px; font-size: 9pt; font-weight: 600; color: white; }
+  .title { font-size: 16pt; font-weight: 700; margin-bottom: 6px; }
+  .address { font-size: 10pt; color: #666; margin-bottom: 10px; }
+  .description { font-size: 10pt; color: #555; line-height: 1.6; margin-bottom: 14px; padding: 10px; background: #f8f9fa; border-radius: 6px; }
+  .content-grid { display: flex; gap: 16px; margin-bottom: 14px; }
+  .map-area { flex: 1; }
+  .map-area iframe, .map-area img { width: 100%; height: 220px; border: 1px solid #ddd; border-radius: 6px; }
+  .photos { flex: 1; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; font-size: 9pt; color: #666; padding-top: 10px; border-top: 1px solid #e0e0e0; }
+  .meta-item { display: flex; gap: 6px; }
+  .meta-label { font-weight: 600; color: #444; min-width: 60px; }
+  .memo-section { margin-top: 12px; padding: 10px; background: #fffde7; border-radius: 6px; border: 1px solid #fff9c4; }
+  .memo-section h3 { font-size: 10pt; color: #f57f17; margin-bottom: 4px; }
+  .memo-section p { font-size: 9pt; color: #555; }
+  .footer { margin-top: 12px; text-align: center; font-size: 8pt; color: #999; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <h1>街の安全安心マップ - 投稿カード</h1>
+    <div class="badges">
+      <span class="badge" style="background:${color}">${esc(r.category)}</span>
+      <span class="badge" style="background:${adminColor}">${esc(r.admin_status || '投稿')}</span>
+    </div>
+  </div>
+
+  <div class="title">${esc(r.title)}</div>
+  ${r.address ? `<div class="address">📍 ${esc(r.address)}</div>` : ''}
+
+  ${r.description ? `<div class="description">${esc(r.description)}</div>` : ''}
+
+  <div class="content-grid">
+    <div class="map-area">
+      <img src="${staticMapUrl}" alt="地図" onerror="this.parentElement.innerHTML='<iframe src=\\'${mapUrl}\\' frameborder=\\'0\\'></iframe>'">
+    </div>
+    ${photosHtml ? `<div class="photos">${photosHtml}</div>` : ''}
+  </div>
+
+  ${memoSummary ? `<div class="memo-section"><h3>管理メモ</h3><p>${esc(memoSummary)}${r.admin_memo && r.admin_memo.length > 300 ? '...' : ''}</p></div>` : ''}
+
+  <div class="meta-grid">
+    <div class="meta-item"><span class="meta-label">投稿者:</span> ${esc(r.author_name)}</div>
+    <div class="meta-item"><span class="meta-label">投稿日:</span> ${fmtDate(r.created_at)}</div>
+    <div class="meta-item"><span class="meta-label">座標:</span> ${r.latitude.toFixed(6)}, ${r.longitude.toFixed(6)}</div>
+    <div class="meta-item"><span class="meta-label">Gマップ:</span> <a href="https://www.google.com/maps?q=${r.latitude},${r.longitude}" style="color:#1a73e8;font-size:8pt">開く</a></div>
+    ${r.author_real_name ? `<div class="meta-item"><span class="meta-label">本名:</span> ${esc(r.author_real_name)}</div>` : ''}
+    ${r.author_phone ? `<div class="meta-item"><span class="meta-label">電話:</span> ${esc(r.author_phone)}</div>` : ''}
+  </div>
+
+  <div class="footer">投稿ID: ${r.id} | 印刷日: ${new Date().toLocaleDateString('ja-JP')}</div>
+</div>
+<script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`);
+    printWindow.document.close();
   } catch (err) { showToast(err.message, 'error'); }
 }
 

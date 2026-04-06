@@ -5,7 +5,27 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const https = require('https');
+
 const VALID_CATEGORIES = ['環境', '交通・道路', '防犯', '防災', 'その他'];
+const VALID_ADMIN_STATUSES = ['投稿', '受付', '対応中', '解決'];
+
+// 逆ジオコーディング（OpenStreetMap Nominatim）
+function reverseGeocode(lat, lng) {
+  return new Promise((resolve) => {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=ja`;
+    https.get(url, { headers: { 'User-Agent': 'SafetyMapApp/1.0' } }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          resolve(json.display_name || '');
+        } catch (e) { resolve(''); }
+      });
+    }).on('error', () => resolve(''));
+  });
+}
 
 // エリアプリセット
 const AREA_PRESETS = {
@@ -189,13 +209,17 @@ function createReportRoutes(db) {
         }
       }
 
+      // 住所を自動取得
+      let address = '';
+      try { address = await reverseGeocode(lat, lng); } catch (e) {}
+
       const reportId = uuidv4();
       const now = new Date().toISOString();
 
       await db.run(
-        `INSERT INTO reports (id, user_id, latitude, longitude, category, title, description, photo1_url, photo2_url, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?)`,
-        [reportId, user.id, lat, lng, category, sanitizedTitle, sanitizedDesc, photo1_url, photo2_url, now, now]
+        `INSERT INTO reports (id, user_id, latitude, longitude, address, category, title, description, photo1_url, photo2_url, status, admin_status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', '投稿', ?, ?)`,
+        [reportId, user.id, lat, lng, address, category, sanitizedTitle, sanitizedDesc, photo1_url, photo2_url, now, now]
       );
 
       const report = await db.get(
@@ -272,4 +296,4 @@ function createReportRoutes(db) {
   return router;
 }
 
-module.exports = { createReportRoutes, VALID_CATEGORIES, AREA_PRESETS, getAreaBounds, setArea };
+module.exports = { createReportRoutes, VALID_CATEGORIES, VALID_ADMIN_STATUSES, AREA_PRESETS, getAreaBounds, setArea };

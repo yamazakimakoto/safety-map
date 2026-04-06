@@ -2,7 +2,7 @@ const express = require('express');
 const sanitizeHtml = require('sanitize-html');
 const { adminAuth } = require('../middleware/auth');
 const { decryptEmail } = require('./auth');
-const { VALID_CATEGORIES, AREA_PRESETS, getAreaBounds, setArea } = require('./reports');
+const { VALID_CATEGORIES, VALID_ADMIN_STATUSES, AREA_PRESETS, getAreaBounds, setArea } = require('./reports');
 
 function createAdminRoutes(db) {
   const router = express.Router();
@@ -67,7 +67,7 @@ function createAdminRoutes(db) {
   // 投稿編集
   router.put('/reports/:id', auth, async (req, res) => {
     try {
-      const { category, status, title, description } = req.body;
+      const { category, status, title, description, admin_status, admin_memo } = req.body;
       const report = await db.get('SELECT * FROM reports WHERE id = ?', [req.params.id]);
       if (!report) return res.status(404).json({ error: '投稿が見つかりません' });
 
@@ -78,6 +78,8 @@ function createAdminRoutes(db) {
       if (status && ['published', 'hidden', 'resolved'].includes(status)) { updates.push('status = ?'); params.push(status); }
       if (title) { updates.push('title = ?'); params.push(sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} })); }
       if (description !== undefined) { updates.push('description = ?'); params.push(sanitizeHtml(description, { allowedTags: [], allowedAttributes: {} })); }
+      if (admin_status && VALID_ADMIN_STATUSES.includes(admin_status)) { updates.push('admin_status = ?'); params.push(admin_status); }
+      if (admin_memo !== undefined) { updates.push('admin_memo = ?'); params.push(sanitizeHtml(admin_memo.substring(0, 2000), { allowedTags: [], allowedAttributes: {} })); }
 
       if (updates.length === 0) return res.status(400).json({ error: '更新する項目がありません' });
 
@@ -218,7 +220,7 @@ function createAdminRoutes(db) {
 
       // CSV生成
       const BOM = '\uFEFF';
-      const header = 'ID,カテゴリー,タイトル,詳細,ステータス,緯度,経度,Googleマップ座標,投稿者表示名,投稿者本名,投稿者電話番号,写真1,写真2,投稿日時,更新日時';
+      const header = 'ID,カテゴリー,タイトル,詳細,住所,公開ステータス,管理ステータス,管理メモ,緯度,経度,Googleマップ座標,投稿者表示名,投稿者本名,投稿者電話番号,写真1,写真2,投稿日時,更新日時';
       const rows = reports.map(r => {
         let email = '';
         try { email = decryptEmail(r.author_email_enc); } catch (e) {}
@@ -227,7 +229,9 @@ function createAdminRoutes(db) {
         return [
           r.id, r.category, `"${(r.title || '').replace(/"/g, '""')}"`,
           `"${(r.description || '').replace(/"/g, '""')}"`,
-          r.status, r.latitude, r.longitude, googleCoord,
+          `"${(r.address || '').replace(/"/g, '""')}"`,
+          r.status, r.admin_status || '投稿', `"${(r.admin_memo || '').replace(/"/g, '""')}"`,
+          r.latitude, r.longitude, googleCoord,
           `"${r.author_name}"`, `"${r.author_real_name || ''}"`, `"${r.author_phone || ''}"`,
           r.photo1_url || '', r.photo2_url || '',
           r.created_at, r.updated_at

@@ -101,7 +101,7 @@
               <th>カテゴリー</th>
               <th>タイトル</th>
               <th>投稿者</th>
-              <th>ステータス</th>
+              <th>管理状況</th>
               <th>投稿日</th>
               <th>操作</th>
             </tr>
@@ -237,8 +237,16 @@
           <div class="form-group"><label>タイトル</label><input type="text" id="editTitle" required></div>
           <div class="form-group"><label>詳細</label><textarea id="editDescription" rows="4"></textarea></div>
           <div class="form-group">
-            <label>ステータス</label>
+            <label>公開ステータス</label>
             <select id="editStatus"><option value="published">公開</option><option value="hidden">非公開</option><option value="resolved">対応済</option></select>
+          </div>
+          <div class="form-group">
+            <label>管理ステータス</label>
+            <select id="editAdminStatus"><option value="投稿">投稿</option><option value="受付">受付</option><option value="対応中">対応中</option><option value="解決">解決</option></select>
+          </div>
+          <div class="form-group">
+            <label>管理メモ（最大2000字）</label>
+            <textarea id="editAdminMemo" rows="6" maxlength="2000" placeholder="対応状況や備考を記入..."></textarea>
           </div>
           <button type="submit" class="btn btn-primary btn-block">更新する</button>
         </form>
