@@ -216,7 +216,21 @@
             <label>詳細メモ</label>
             <textarea id="userEditDescription" rows="4"></textarea>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">更新する</button>
+          <div class="form-group">
+            <label>写真</label>
+            <div id="userEditPhotos"></div>
+            <div class="photo-upload" style="margin-top:8px">
+              <div class="photo-slot" id="editPhotoSlot1" onclick="document.getElementById('editPhotoInput1').click()">
+                <div class="placeholder">新しい写真1</div>
+              </div>
+              <div class="photo-slot" id="editPhotoSlot2" onclick="document.getElementById('editPhotoInput2').click()">
+                <div class="placeholder">新しい写真2</div>
+              </div>
+            </div>
+            <input type="file" id="editPhotoInput1" accept="image/*" style="display:none" onchange="previewEditPhoto(this, 1)">
+            <input type="file" id="editPhotoInput2" accept="image/*" style="display:none" onchange="previewEditPhoto(this, 2)">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="userEditSubmitBtn">更新する</button>
         </form>
       </div>
       <div class="modal-footer">

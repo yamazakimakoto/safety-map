@@ -236,8 +236,8 @@ function createReportRoutes(db) {
     }
   });
 
-  // 自分の投稿を編集（場所以外）
-  router.put('/:id', async (req, res) => {
+  // 自分の投稿を編集（場所以外、写真の更新・削除に対応）
+  router.put('/:id', upload.array('photos', 2), async (req, res) => {
     try {
       const token = req.headers['x-user-token'];
       if (!token) return res.status(401).json({ error: 'ログインが必要です' });
@@ -247,13 +247,45 @@ function createReportRoutes(db) {
       const report = await db.get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
       if (!report) return res.status(404).json({ error: '投稿が見つからないか、編集権限がありません' });
 
-      const { category, title, description } = req.body;
+      const { category, title, description, delete_photo1, delete_photo2 } = req.body;
       const updates = [];
       const params = [];
 
       if (category && VALID_CATEGORIES.includes(category)) { updates.push('category = ?'); params.push(category); }
       if (title) { updates.push('title = ?'); params.push(sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} })); }
       if (description !== undefined) { updates.push('description = ?'); params.push(sanitizeHtml(description, { allowedTags: [], allowedAttributes: {} })); }
+
+      // 写真削除
+      if (delete_photo1 === '1') { updates.push("photo1_url = ?"); params.push(''); }
+      if (delete_photo2 === '1') { updates.push("photo2_url = ?"); params.push(''); }
+
+      // 新しい写真アップロード
+      if (req.files && req.files.length > 0) {
+        let fileIndex = 0;
+        // photo1が空（削除済み or 元々なし）なら1枚目をphoto1に
+        const photo1Empty = delete_photo1 === '1' || !report.photo1_url;
+        const photo2Empty = delete_photo2 === '1' || !report.photo2_url;
+
+        if (photo1Empty && fileIndex < req.files.length) {
+          const url = await uploadToCloudinary(req.files[fileIndex].path);
+          updates.push("photo1_url = ?"); params.push(url);
+          fileIndex++;
+        }
+        if (photo2Empty && fileIndex < req.files.length) {
+          const url = await uploadToCloudinary(req.files[fileIndex].path);
+          updates.push("photo2_url = ?"); params.push(url);
+          fileIndex++;
+        }
+        // 既存写真があっても新しいファイルがあれば上書き
+        if (fileIndex === 0 && req.files.length > 0) {
+          const url = await uploadToCloudinary(req.files[0].path);
+          updates.push("photo1_url = ?"); params.push(url);
+          if (req.files.length > 1) {
+            const url2 = await uploadToCloudinary(req.files[1].path);
+            updates.push("photo2_url = ?"); params.push(url2);
+          }
+        }
+      }
 
       if (updates.length === 0) return res.status(400).json({ error: '更新する項目がありません' });
 

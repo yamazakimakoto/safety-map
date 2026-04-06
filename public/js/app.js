@@ -482,8 +482,9 @@ async function showMyPosts() {
           <div class="report-card-title">${escapeHtml(r.title)}</div>
           <p style="font-size:13px;color:#666;margin:4px 0">${escapeHtml((r.description || '').substring(0, 100))}</p>
           <div class="report-card-meta">投稿日: ${formatDate(r.created_at)} / 座標: ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</div>
+          ${r.photo1_url || r.photo2_url ? `<div class="report-photos" style="margin-top:6px">${r.photo1_url ? `<img src="${escapeHtml(r.photo1_url)}">` : ''}${r.photo2_url ? `<img src="${escapeHtml(r.photo2_url)}">` : ''}</div>` : ''}
           <div style="margin-top:10px;display:flex;gap:8px">
-            <button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="openUserEditReport('${r.id}','${escapeAttr(r.category)}','${escapeAttr(r.title)}','${escapeAttr(r.description||'')}')">編集</button>
+            <button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="openUserEditReport('${r.id}','${escapeAttr(r.category)}','${escapeAttr(r.title)}','${escapeAttr(r.description||'')}','${escapeAttr(r.photo1_url||'')}','${escapeAttr(r.photo2_url||'')}')">編集</button>
             <button class="btn btn-danger" style="padding:6px 14px;font-size:13px" onclick="deleteMyReport('${r.id}')">削除</button>
           </div>
         </div>`;
@@ -497,12 +498,70 @@ function closeMyPostsModal() {
   document.getElementById('myPostsModal').classList.add('hidden');
 }
 
-function openUserEditReport(id, category, title, description) {
+let editDeletePhoto1 = false;
+let editDeletePhoto2 = false;
+
+function openUserEditReport(id, category, title, description, photo1, photo2) {
   document.getElementById('userEditId').value = id;
   document.getElementById('userEditCategory').value = category;
   document.getElementById('userEditTitle').value = title;
   document.getElementById('userEditDescription').value = description;
+  editDeletePhoto1 = false;
+  editDeletePhoto2 = false;
+  document.getElementById('editPhotoInput1').value = '';
+  document.getElementById('editPhotoInput2').value = '';
+
+  // 既存写真の表示
+  let photosHtml = '';
+  if (photo1) {
+    photosHtml += `<div style="display:inline-block;position:relative;margin-right:8px;margin-bottom:8px">
+      <img src="${escapeHtml(photo1)}" id="existingPhoto1" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid #ddd">
+      <button type="button" onclick="markDeletePhoto(1)" style="position:absolute;top:-6px;right:-6px;background:#F44336;color:white;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px">&times;</button>
+    </div>`;
+  }
+  if (photo2) {
+    photosHtml += `<div style="display:inline-block;position:relative;margin-right:8px;margin-bottom:8px">
+      <img src="${escapeHtml(photo2)}" id="existingPhoto2" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid #ddd">
+      <button type="button" onclick="markDeletePhoto(2)" style="position:absolute;top:-6px;right:-6px;background:#F44336;color:white;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px">&times;</button>
+    </div>`;
+  }
+  if (!photo1 && !photo2) photosHtml = '<p style="font-size:13px;color:#999">写真なし</p>';
+  document.getElementById('userEditPhotos').innerHTML = photosHtml;
+
+  // 新しい写真スロットをリセット
+  resetEditPhotoSlot(1);
+  resetEditPhotoSlot(2);
+
   document.getElementById('userEditModal').classList.remove('hidden');
+}
+
+function markDeletePhoto(n) {
+  if (n === 1) editDeletePhoto1 = true;
+  if (n === 2) editDeletePhoto2 = true;
+  const el = document.getElementById('existingPhoto' + n);
+  if (el) el.parentElement.style.opacity = '0.3';
+  showToast(`写真${n}を削除対象にしました（更新ボタンで確定）`);
+}
+
+function previewEditPhoto(input, slot) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('写真のサイズは5MB以下にしてください', 'error');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const slotEl = document.getElementById('editPhotoSlot' + slot);
+    slotEl.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-photo" onclick="resetEditPhotoSlot(${slot})" style="display:block">&times;</button>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetEditPhotoSlot(slot) {
+  document.getElementById('editPhotoInput' + slot).value = '';
+  document.getElementById('editPhotoSlot' + slot).innerHTML = `<div class="placeholder">新しい写真${slot}</div>`;
 }
 
 function closeUserEditModal() {
@@ -512,15 +571,28 @@ function closeUserEditModal() {
 async function handleUserEditReport(e) {
   e.preventDefault();
   const id = document.getElementById('userEditId').value;
+  const submitBtn = document.getElementById('userEditSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner"></span> 更新中...';
+
   try {
+    const formData = new FormData();
+    formData.append('category', document.getElementById('userEditCategory').value);
+    formData.append('title', document.getElementById('userEditTitle').value);
+    formData.append('description', document.getElementById('userEditDescription').value);
+
+    if (editDeletePhoto1) formData.append('delete_photo1', '1');
+    if (editDeletePhoto2) formData.append('delete_photo2', '1');
+
+    const newPhoto1 = document.getElementById('editPhotoInput1').files[0];
+    const newPhoto2 = document.getElementById('editPhotoInput2').files[0];
+    if (newPhoto1) formData.append('photos', newPhoto1);
+    if (newPhoto2) formData.append('photos', newPhoto2);
+
     const res = await fetch(`/api/reports/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-user-token': userToken },
-      body: JSON.stringify({
-        category: document.getElementById('userEditCategory').value,
-        title: document.getElementById('userEditTitle').value,
-        description: document.getElementById('userEditDescription').value
-      })
+      headers: { 'x-user-token': userToken },
+      body: formData
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -529,6 +601,10 @@ async function handleUserEditReport(e) {
     showMyPosts();
     loadReports();
   } catch (err) { showToast(err.message, 'error'); }
+  finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '更新する';
+  }
 }
 
 async function deleteMyReport(id) {
