@@ -220,21 +220,33 @@ function createAdminRoutes(db) {
 
       // CSV生成
       const BOM = '\uFEFF';
+      // CSV安全エスケープ関数
+      function csvCell(val) {
+        const s = String(val == null ? '' : val);
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+
       const header = 'ID,カテゴリー,タイトル,詳細,住所,公開ステータス,管理ステータス,管理メモ,緯度,経度,Googleマップ座標,投稿者表示名,投稿者本名,投稿者電話番号,写真1,写真2,投稿日時,更新日時';
       const rows = reports.map(r => {
-        let email = '';
-        try { email = decryptEmail(r.author_email_enc); } catch (e) {}
-        const googleCoord = `${r.latitude},${r.longitude}`;
-        const googleMapUrl = `https://www.google.com/maps?q=${r.latitude},${r.longitude}`;
         return [
-          r.id, r.category, `"${(r.title || '').replace(/"/g, '""')}"`,
-          `"${(r.description || '').replace(/"/g, '""')}"`,
-          `"${(r.address || '').replace(/"/g, '""')}"`,
-          r.status, r.admin_status || '投稿', `"${(r.admin_memo || '').replace(/"/g, '""')}"`,
-          r.latitude, r.longitude, googleCoord,
-          `"${r.author_name}"`, `"${r.author_real_name || ''}"`, `"${r.author_phone || ''}"`,
-          r.photo1_url || '', r.photo2_url || '',
-          r.created_at, r.updated_at
+          csvCell(r.id),
+          csvCell(r.category),
+          csvCell(r.title),
+          csvCell(r.description),
+          csvCell(r.address),
+          csvCell(r.status),
+          csvCell(r.admin_status || '投稿'),
+          csvCell(r.admin_memo),
+          csvCell(r.latitude),
+          csvCell(r.longitude),
+          csvCell(`${r.latitude} ${r.longitude}`),
+          csvCell(r.author_name),
+          csvCell(r.author_real_name),
+          csvCell(r.author_phone),
+          csvCell(r.photo1_url),
+          csvCell(r.photo2_url),
+          csvCell(r.created_at),
+          csvCell(r.updated_at)
         ].join(',');
       });
 
@@ -257,12 +269,16 @@ function createAdminRoutes(db) {
 
       const BOM = '\uFEFF';
       const header = 'ID,メールアドレス,表示名,本名,住所,電話番号,登録日時';
+      function csvCell2(val) {
+        const s = String(val == null ? '' : val);
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
       const rows = users.map(u => {
         let email = '';
         try { email = decryptEmail(u.email_encrypted); } catch (e) {}
         return [
-          u.id, email, `"${u.display_name}"`, `"${u.real_name || ''}"`,
-          `"${u.address || ''}"`, `"${u.phone || ''}"`, u.created_at
+          csvCell2(u.id), csvCell2(email), csvCell2(u.display_name), csvCell2(u.real_name),
+          csvCell2(u.address), csvCell2(u.phone), csvCell2(u.created_at)
         ].join(',');
       });
 
