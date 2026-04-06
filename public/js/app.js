@@ -276,11 +276,13 @@ function updateAuthUI() {
     btn.textContent = 'ログアウト';
     btn.addEventListener('click', handleLogout);
     myBtn.style.display = 'inline-block';
+    document.getElementById('changePwBtn').style.display = 'inline-block';
   } else {
     info.textContent = '';
     btn.textContent = 'ログイン';
     btn.addEventListener('click', showAuthModal);
     myBtn.style.display = 'none';
+    document.getElementById('changePwBtn').style.display = 'none';
   }
 }
 
@@ -308,12 +310,13 @@ function switchAuthTab(tab) {
 async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
 
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, password })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -334,6 +337,8 @@ async function handleRegister(e) {
   e.preventDefault();
   const email = document.getElementById('regEmail').value;
   const emailConfirm = document.getElementById('regEmailConfirm').value;
+  const password = document.getElementById('regPassword').value;
+  const passwordConfirm = document.getElementById('regPasswordConfirm').value;
   const display_name = document.getElementById('regName').value;
   const real_name = document.getElementById('regRealName').value;
   const address = document.getElementById('regAddress').value;
@@ -343,12 +348,20 @@ async function handleRegister(e) {
     showToast('メールアドレスが一致しません', 'error');
     return;
   }
+  if (password !== passwordConfirm) {
+    showToast('パスワードが一致しません', 'error');
+    return;
+  }
+  if (password.length < 6) {
+    showToast('パスワードは6文字以上にしてください', 'error');
+    return;
+  }
 
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, display_name, real_name, address, phone })
+      body: JSON.stringify({ email, password, display_name, real_name, address, phone })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -484,6 +497,30 @@ async function handleSubmitReport(e) {
     submitBtn.disabled = false;
     submitBtn.textContent = '投稿する';
   }
+}
+
+// === パスワード変更 ===
+function showChangePwModal() {
+  document.getElementById('changePwModal').classList.remove('hidden');
+}
+
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const current_password = document.getElementById('currentPwUser').value;
+  const new_password = document.getElementById('newPwUser').value;
+  try {
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': userToken },
+      body: JSON.stringify({ current_password, new_password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast(data.message, 'success');
+    document.getElementById('changePwModal').classList.add('hidden');
+    document.getElementById('currentPwUser').value = '';
+    document.getElementById('newPwUser').value = '';
+  } catch (err) { showToast(err.message, 'error'); }
 }
 
 // === マイ投稿 ===

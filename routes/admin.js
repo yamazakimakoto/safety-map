@@ -181,6 +181,24 @@ function createAdminRoutes(db) {
     }
   });
 
+  // ユーザーパスワードリセット
+  router.put('/users/:id/reset-password', auth, async (req, res) => {
+    try {
+      const { new_password } = req.body;
+      if (!new_password || new_password.length < 6) {
+        return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
+      }
+      const user = await db.get('SELECT * FROM sm_users WHERE id = ?', [req.params.id]);
+      if (!user) return res.status(404).json({ error: 'ユーザーが見つかりません' });
+      const hash = bcrypt.hashSync(new_password, 10);
+      await db.run('UPDATE sm_users SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
+      res.json({ message: 'パスワードをリセットしました' });
+    } catch (error) {
+      console.error('ユーザーPWリセットエラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
   // ユーザー削除（関連投稿も削除）
   router.delete('/users/:id', auth, async (req, res) => {
     try {

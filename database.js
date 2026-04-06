@@ -44,6 +44,7 @@ const CREATE_TABLES = `
     email_hash TEXT NOT NULL UNIQUE,
     email_encrypted TEXT NOT NULL,
     display_name TEXT NOT NULL,
+    password_hash TEXT DEFAULT '',
     real_name TEXT DEFAULT '',
     address TEXT DEFAULT '',
     phone TEXT DEFAULT '',
@@ -110,6 +111,7 @@ async function initDatabase() {
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
@@ -137,6 +139,7 @@ async function initDatabase() {
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}

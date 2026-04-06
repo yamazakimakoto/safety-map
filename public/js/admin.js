@@ -186,6 +186,7 @@ async function loadAdminUsers() {
         <td>
           <div class="admin-actions">
             <button onclick="openUserEditModal('${u.id}','${escA(u.display_name)}','${escA(u.real_name||'')}','${escA(u.address||'')}','${escA(u.phone||'')}')">編集</button>
+            <button onclick="resetUserPassword('${u.id}','${escA(u.display_name)}')">PW</button>
             <button class="delete" onclick="deleteUser('${u.id}','${escA(u.display_name)}')">削除</button>
           </div>
         </td>
@@ -213,6 +214,20 @@ async function handleEditUser(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     showToast('更新しました', 'success'); closeModal('userEditModal'); loadAdminUsers();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function resetUserPassword(id, name) {
+  const newPw = prompt(`「${name}」の新しいパスワードを入力（6文字以上）:`);
+  if (!newPw) return;
+  try {
+    const res = await fetch(`/api/admin/users/${id}/reset-password`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ new_password: newPw })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast(data.message, 'success');
   } catch (err) { showToast(err.message, 'error'); }
 }
 

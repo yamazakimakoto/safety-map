@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const sanitizeHtml = require('sanitize-html');
 const crypto = require('crypto');
@@ -34,10 +35,14 @@ function createAuthRoutes(db) {
   // ユーザー登録
   router.post('/register', async (req, res) => {
     try {
-      const { email, display_name } = req.body;
+      const { email, password, display_name, real_name, address, phone } = req.body;
 
-      if (!email || !display_name) {
-        return res.status(400).json({ error: 'メールアドレスと表示名は必須です' });
+      if (!email || !password || !display_name) {
+        return res.status(400).json({ error: 'メールアドレス、パスワード、表示名は必須です' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
       }
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,29 +55,21 @@ function createAuthRoutes(db) {
         return res.status(400).json({ error: '表示名は1〜50文字で入力してください' });
       }
 
-      const { real_name, address, phone } = req.body;
-
       const emailHash = hashEmail(email);
-      const existing = await db.get('SELECT id, session_token FROM sm_users WHERE email_hash = ?', [emailHash]);
+      const existing = await db.get('SELECT id FROM sm_users WHERE email_hash = ?', [emailHash]);
       if (existing) {
-        const newToken = uuidv4();
-        await db.run('UPDATE sm_users SET session_token = ? WHERE id = ?', [newToken, existing.id]);
-        const user = await db.get('SELECT id, display_name FROM sm_users WHERE id = ?', [existing.id]);
-        return res.json({
-          message: '登録済みのメールアドレスです。ログインしました。',
-          token: newToken,
-          user: { id: user.id, display_name: user.display_name }
-        });
+        return res.status(400).json({ error: 'このメールアドレスは既に登録されています。ログインしてください。' });
       }
 
       const userId = uuidv4();
       const sessionToken = uuidv4();
       const encryptedEmail = encryptEmail(email);
+      const passwordHash = bcrypt.hashSync(password, 10);
 
       await db.run(
-        'INSERT INTO sm_users (id, email_hash, email_encrypted, display_name, real_name, address, phone, session_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO sm_users (id, email_hash, email_encrypted, display_name, password_hash, real_name, address, phone, session_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
-          userId, emailHash, encryptedEmail, sanitizedName,
+          userId, emailHash, encryptedEmail, sanitizedName, passwordHash,
           sanitizeHtml(real_name || '', { allowedTags: [], allowedAttributes: {} }),
           sanitizeHtml(address || '', { allowedTags: [], allowedAttributes: {} }),
           sanitizeHtml(phone || '', { allowedTags: [], allowedAttributes: {} }),
@@ -94,15 +91,24 @@ function createAuthRoutes(db) {
   // ログイン
   router.post('/login', async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ error: 'メールアドレスを入力してください' });
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'メールアドレスとパスワードを入力してください' });
       }
 
       const emailHash = hashEmail(email);
-      const user = await db.get('SELECT id, display_name FROM sm_users WHERE email_hash = ?', [emailHash]);
+      const user = await db.get('SELECT id, display_name, password_hash FROM sm_users WHERE email_hash = ?', [emailHash]);
       if (!user) {
         return res.status(404).json({ error: '登録されていないメールアドレスです。先にユーザー登録を行ってください。' });
+      }
+
+      // パスワード未設定の既存ユーザー（移行対応）
+      if (!user.password_hash) {
+        return res.status(400).json({ error: 'パスワードが未設定です。管理者にパスワードリセットを依頼してください。' });
+      }
+
+      if (!bcrypt.compareSync(password, user.password_hash)) {
+        return res.status(401).json({ error: 'パスワードが正しくありません' });
       }
 
       const newToken = uuidv4();
@@ -160,6 +166,34 @@ function createAuthRoutes(db) {
       res.json({ message: '登録情報を更新しました', display_name: sanitizedName });
     } catch (error) {
       console.error('プロフィール更新エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // ユーザーパスワード変更
+  router.post('/change-password', async (req, res) => {
+    try {
+      const token = req.headers['x-user-token'];
+      if (!token) return res.status(401).json({ error: '認証が必要です' });
+      const user = await db.get('SELECT id, password_hash FROM sm_users WHERE session_token = ?', [token]);
+      if (!user) return res.status(401).json({ error: '認証エラー' });
+
+      const { current_password, new_password } = req.body;
+      if (!current_password || !new_password) {
+        return res.status(400).json({ error: '現在のパスワードと新しいパスワードを入力してください' });
+      }
+      if (user.password_hash && !bcrypt.compareSync(current_password, user.password_hash)) {
+        return res.status(400).json({ error: '現在のパスワードが正しくありません' });
+      }
+      if (new_password.length < 6) {
+        return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
+      }
+
+      const newHash = bcrypt.hashSync(new_password, 10);
+      await db.run('UPDATE sm_users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+      res.json({ message: 'パスワードを変更しました' });
+    } catch (error) {
+      console.error('パスワード変更エラー:', error);
       res.status(500).json({ error: 'サーバーエラーが発生しました' });
     }
   });
