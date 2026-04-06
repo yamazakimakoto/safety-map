@@ -105,7 +105,7 @@ function createReportRoutes(db) {
     try {
       const { category } = req.query;
       let sql = `SELECT r.*, u.display_name as author_name
-                 FROM reports r JOIN users u ON r.user_id = u.id
+                 FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
                  WHERE r.status = 'published'`;
       const params = [];
 
@@ -129,11 +129,11 @@ function createReportRoutes(db) {
     try {
       const token = req.headers['x-user-token'];
       if (!token) return res.status(401).json({ error: 'ログインが必要です' });
-      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      const user = await db.get('SELECT id FROM sm_users WHERE session_token = ?', [token]);
       if (!user) return res.status(401).json({ error: '無効なセッションです' });
 
       const reports = await db.all(
-        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id
+        `SELECT r.*, u.display_name as author_name FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
          WHERE r.user_id = ? ORDER BY r.created_at DESC`,
         [user.id]
       );
@@ -149,7 +149,7 @@ function createReportRoutes(db) {
     try {
       const report = await db.get(
         `SELECT r.*, u.display_name as author_name
-         FROM reports r JOIN users u ON r.user_id = u.id
+         FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
          WHERE r.id = ?`,
         [req.params.id]
       );
@@ -170,7 +170,7 @@ function createReportRoutes(db) {
       if (!token) {
         return res.status(401).json({ error: 'ログインが必要です' });
       }
-      const user = await db.get('SELECT id, display_name FROM users WHERE session_token = ?', [token]);
+      const user = await db.get('SELECT id, display_name FROM sm_users WHERE session_token = ?', [token]);
       if (!user) {
         return res.status(401).json({ error: '無効なセッションです' });
       }
@@ -217,14 +217,14 @@ function createReportRoutes(db) {
       const now = new Date().toISOString();
 
       await db.run(
-        `INSERT INTO reports (id, user_id, latitude, longitude, address, category, title, description, photo1_url, photo2_url, status, admin_status, created_at, updated_at)
+        `INSERT INTO sm_reports (id, user_id, latitude, longitude, address, category, title, description, photo1_url, photo2_url, status, admin_status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', '投稿', ?, ?)`,
         [reportId, user.id, lat, lng, address, category, sanitizedTitle, sanitizedDesc, photo1_url, photo2_url, now, now]
       );
 
       const report = await db.get(
         `SELECT r.*, u.display_name as author_name
-         FROM reports r JOIN users u ON r.user_id = u.id
+         FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
          WHERE r.id = ?`,
         [reportId]
       );
@@ -241,10 +241,10 @@ function createReportRoutes(db) {
     try {
       const token = req.headers['x-user-token'];
       if (!token) return res.status(401).json({ error: 'ログインが必要です' });
-      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      const user = await db.get('SELECT id FROM sm_users WHERE session_token = ?', [token]);
       if (!user) return res.status(401).json({ error: '無効なセッションです' });
 
-      const report = await db.get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
+      const report = await db.get('SELECT * FROM sm_reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
       if (!report) return res.status(404).json({ error: '投稿が見つからないか、編集権限がありません' });
 
       const { category, title, description, delete_photo1, delete_photo2 } = req.body;
@@ -293,10 +293,10 @@ function createReportRoutes(db) {
       params.push(new Date().toISOString());
       params.push(req.params.id);
 
-      await db.run(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`, params);
+      await db.run(`UPDATE sm_reports SET ${updates.join(', ')} WHERE id = ?`, params);
 
       const updated = await db.get(
-        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id WHERE r.id = ?`,
+        `SELECT r.*, u.display_name as author_name FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE r.id = ?`,
         [req.params.id]
       );
       res.json({ message: '投稿を更新しました', report: updated });
@@ -311,13 +311,13 @@ function createReportRoutes(db) {
     try {
       const token = req.headers['x-user-token'];
       if (!token) return res.status(401).json({ error: 'ログインが必要です' });
-      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      const user = await db.get('SELECT id FROM sm_users WHERE session_token = ?', [token]);
       if (!user) return res.status(401).json({ error: '無効なセッションです' });
 
-      const report = await db.get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
+      const report = await db.get('SELECT * FROM sm_reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
       if (!report) return res.status(404).json({ error: '投稿が見つからないか、削除権限がありません' });
 
-      await db.run('DELETE FROM reports WHERE id = ?', [req.params.id]);
+      await db.run('DELETE FROM sm_reports WHERE id = ?', [req.params.id]);
       res.json({ message: '投稿を削除しました' });
     } catch (error) {
       console.error('投稿削除エラー:', error);

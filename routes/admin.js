@@ -18,7 +18,7 @@ function createAdminRoutes(db) {
       const { category, status } = req.query;
       let sql = `SELECT r.*, u.display_name as author_name, u.email_encrypted as author_email_enc,
                  u.real_name as author_real_name, u.address as author_address, u.phone as author_phone
-                 FROM reports r JOIN users u ON r.user_id = u.id WHERE 1=1`;
+                 FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE 1=1`;
       const params = [];
 
       if (category && VALID_CATEGORIES.includes(category)) {
@@ -53,7 +53,7 @@ function createAdminRoutes(db) {
         `SELECT r.*, u.display_name as author_name, u.email_encrypted as author_email_enc,
          u.real_name as author_real_name, u.address as author_address, u.phone as author_phone,
          u.created_at as author_registered_at
-         FROM reports r JOIN users u ON r.user_id = u.id WHERE r.id = ?`,
+         FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE r.id = ?`,
         [req.params.id]
       );
       if (!report) return res.status(404).json({ error: '投稿が見つかりません' });
@@ -70,7 +70,7 @@ function createAdminRoutes(db) {
   router.put('/reports/:id', auth, async (req, res) => {
     try {
       const { category, status, title, description, admin_status, admin_memo } = req.body;
-      const report = await db.get('SELECT * FROM reports WHERE id = ?', [req.params.id]);
+      const report = await db.get('SELECT * FROM sm_reports WHERE id = ?', [req.params.id]);
       if (!report) return res.status(404).json({ error: '投稿が見つかりません' });
 
       const updates = [];
@@ -89,10 +89,10 @@ function createAdminRoutes(db) {
       params.push(new Date().toISOString());
       params.push(req.params.id);
 
-      await db.run(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`, params);
+      await db.run(`UPDATE sm_reports SET ${updates.join(', ')} WHERE id = ?`, params);
 
       const updated = await db.get(
-        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id WHERE r.id = ?`,
+        `SELECT r.*, u.display_name as author_name FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE r.id = ?`,
         [req.params.id]
       );
       res.json({ message: '投稿を更新しました', report: updated });
@@ -105,9 +105,9 @@ function createAdminRoutes(db) {
   // 投稿削除
   router.delete('/reports/:id', auth, async (req, res) => {
     try {
-      const report = await db.get('SELECT * FROM reports WHERE id = ?', [req.params.id]);
+      const report = await db.get('SELECT * FROM sm_reports WHERE id = ?', [req.params.id]);
       if (!report) return res.status(404).json({ error: '投稿が見つかりません' });
-      await db.run('DELETE FROM reports WHERE id = ?', [req.params.id]);
+      await db.run('DELETE FROM sm_reports WHERE id = ?', [req.params.id]);
       res.json({ message: '投稿を削除しました' });
     } catch (error) {
       console.error('投稿削除エラー:', error);
@@ -121,12 +121,12 @@ function createAdminRoutes(db) {
   router.get('/users', auth, async (req, res) => {
     try {
       const users = await db.all(
-        'SELECT id, email_encrypted, display_name, real_name, address, phone, created_at FROM users ORDER BY created_at DESC'
+        'SELECT id, email_encrypted, display_name, real_name, address, phone, created_at FROM sm_users ORDER BY created_at DESC'
       );
       for (const u of users) {
         try { u.email = decryptEmail(u.email_encrypted); } catch (e) { u.email = ''; }
         delete u.email_encrypted;
-        const rc = await db.get('SELECT COUNT(*) as count FROM reports WHERE user_id = ?', [u.id]);
+        const rc = await db.get('SELECT COUNT(*) as count FROM sm_reports WHERE user_id = ?', [u.id]);
         u.report_count = rc.count;
       }
       res.json(users);
@@ -140,13 +140,13 @@ function createAdminRoutes(db) {
   router.get('/users/:id', auth, async (req, res) => {
     try {
       const user = await db.get(
-        'SELECT id, email_encrypted, display_name, real_name, address, phone, created_at FROM users WHERE id = ?',
+        'SELECT id, email_encrypted, display_name, real_name, address, phone, created_at FROM sm_users WHERE id = ?',
         [req.params.id]
       );
       if (!user) return res.status(404).json({ error: 'ユーザーが見つかりません' });
       try { user.email = decryptEmail(user.email_encrypted); } catch (e) { user.email = ''; }
       delete user.email_encrypted;
-      const reports = await db.all('SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC', [user.id]);
+      const reports = await db.all('SELECT * FROM sm_reports WHERE user_id = ? ORDER BY created_at DESC', [user.id]);
       user.reports = reports;
       res.json(user);
     } catch (error) {
@@ -158,14 +158,14 @@ function createAdminRoutes(db) {
   // ユーザー編集
   router.put('/users/:id', auth, async (req, res) => {
     try {
-      const user = await db.get('SELECT * FROM users WHERE id = ?', [req.params.id]);
+      const user = await db.get('SELECT * FROM sm_users WHERE id = ?', [req.params.id]);
       if (!user) return res.status(404).json({ error: 'ユーザーが見つかりません' });
 
       const { display_name, real_name, address, phone } = req.body;
       if (!display_name) return res.status(400).json({ error: '表示名は必須です' });
 
       await db.run(
-        'UPDATE users SET display_name = ?, real_name = ?, address = ?, phone = ? WHERE id = ?',
+        'UPDATE sm_users SET display_name = ?, real_name = ?, address = ?, phone = ? WHERE id = ?',
         [
           sanitizeHtml(display_name, { allowedTags: [], allowedAttributes: {} }),
           sanitizeHtml(real_name || '', { allowedTags: [], allowedAttributes: {} }),
@@ -184,10 +184,10 @@ function createAdminRoutes(db) {
   // ユーザー削除（関連投稿も削除）
   router.delete('/users/:id', auth, async (req, res) => {
     try {
-      const user = await db.get('SELECT * FROM users WHERE id = ?', [req.params.id]);
+      const user = await db.get('SELECT * FROM sm_users WHERE id = ?', [req.params.id]);
       if (!user) return res.status(404).json({ error: 'ユーザーが見つかりません' });
-      await db.run('DELETE FROM reports WHERE user_id = ?', [req.params.id]);
-      await db.run('DELETE FROM users WHERE id = ?', [req.params.id]);
+      await db.run('DELETE FROM sm_reports WHERE user_id = ?', [req.params.id]);
+      await db.run('DELETE FROM sm_users WHERE id = ?', [req.params.id]);
       res.json({ message: 'ユーザーと関連投稿を削除しました' });
     } catch (error) {
       console.error('ユーザー削除エラー:', error);
@@ -202,7 +202,7 @@ function createAdminRoutes(db) {
       const { category, status, date_from, date_to, ids } = req.query;
       let sql = `SELECT r.*, u.display_name as author_name, u.email_encrypted as author_email_enc,
                  u.real_name as author_real_name, u.phone as author_phone
-                 FROM reports r JOIN users u ON r.user_id = u.id WHERE 1=1`;
+                 FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE 1=1`;
       const params = [];
 
       if (ids) {
@@ -267,7 +267,7 @@ function createAdminRoutes(db) {
   // ユーザーバックアップ
   router.get('/backup/users', auth, async (req, res) => {
     try {
-      const users = await db.all('SELECT id, email_encrypted, display_name, real_name, address, phone, created_at FROM users ORDER BY created_at DESC');
+      const users = await db.all('SELECT id, email_encrypted, display_name, real_name, address, phone, created_at FROM sm_users ORDER BY created_at DESC');
 
       const BOM = '\uFEFF';
       const header = 'ID,メールアドレス,表示名,本名,住所,電話番号,登録日時';
@@ -324,7 +324,7 @@ function createAdminRoutes(db) {
       if (confirm !== 'DELETE_ALL_REPORTS') {
         return res.status(400).json({ error: '確認コードが一致しません' });
       }
-      await db.run('DELETE FROM reports');
+      await db.run('DELETE FROM sm_reports');
       res.json({ message: '全投稿データを削除しました' });
     } catch (error) {
       console.error('投稿初期化エラー:', error);
@@ -339,8 +339,8 @@ function createAdminRoutes(db) {
       if (confirm !== 'DELETE_ALL_USERS') {
         return res.status(400).json({ error: '確認コードが一致しません' });
       }
-      await db.run('DELETE FROM reports');
-      await db.run('DELETE FROM users');
+      await db.run('DELETE FROM sm_reports');
+      await db.run('DELETE FROM sm_users');
       res.json({ message: '全ユーザー・投稿データを削除しました' });
     } catch (error) {
       console.error('ユーザー初期化エラー:', error);
@@ -352,10 +352,10 @@ function createAdminRoutes(db) {
 
   router.get('/stats', auth, async (req, res) => {
     try {
-      const totalReports = await db.get('SELECT COUNT(*) as count FROM reports');
-      const byCategory = await db.all('SELECT category, COUNT(*) as count FROM reports GROUP BY category');
-      const byStatus = await db.all('SELECT status, COUNT(*) as count FROM reports GROUP BY status');
-      const totalUsers = await db.get('SELECT COUNT(*) as count FROM users');
+      const totalReports = await db.get('SELECT COUNT(*) as count FROM sm_reports');
+      const byCategory = await db.all('SELECT category, COUNT(*) as count FROM sm_reports GROUP BY category');
+      const byStatus = await db.all('SELECT status, COUNT(*) as count FROM sm_reports GROUP BY status');
+      const totalUsers = await db.get('SELECT COUNT(*) as count FROM sm_users');
 
       res.json({ totalReports: totalReports.count, totalUsers: totalUsers.count, byCategory, byStatus });
     } catch (error) {
@@ -369,7 +369,7 @@ function createAdminRoutes(db) {
   // 管理者一覧
   router.get('/admins', auth, async (req, res) => {
     try {
-      const admins = await db.all('SELECT id, username, display_name, created_at FROM admins ORDER BY created_at');
+      const admins = await db.all('SELECT id, username, display_name, created_at FROM sm_admins ORDER BY created_at');
       res.json(admins);
     } catch (error) {
       res.status(500).json({ error: 'サーバーエラーが発生しました' });
@@ -386,14 +386,14 @@ function createAdminRoutes(db) {
       if (password.length < 8) {
         return res.status(400).json({ error: 'パスワードは8文字以上にしてください' });
       }
-      const existing = await db.get('SELECT id FROM admins WHERE username = ?', [username]);
+      const existing = await db.get('SELECT id FROM sm_admins WHERE username = ?', [username]);
       if (existing) {
         return res.status(400).json({ error: 'そのユーザー名は既に使用されています' });
       }
       const id = uuidv4();
       const hash = bcrypt.hashSync(password, 10);
       const sanitizedName = sanitizeHtml(display_name, { allowedTags: [], allowedAttributes: {} });
-      await db.run('INSERT INTO admins (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)',
+      await db.run('INSERT INTO sm_admins (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)',
         [id, sanitizeHtml(username, { allowedTags: [], allowedAttributes: {} }), hash, sanitizedName]);
       res.json({ message: `管理者「${sanitizedName}」を追加しました` });
     } catch (error) {
@@ -408,13 +408,13 @@ function createAdminRoutes(db) {
       if (req.params.id === req.admin.id) {
         return res.status(400).json({ error: '自分自身は削除できません' });
       }
-      const count = await db.get('SELECT COUNT(*) as count FROM admins');
+      const count = await db.get('SELECT COUNT(*) as count FROM sm_admins');
       if (parseInt(count.count) <= 1) {
         return res.status(400).json({ error: '最後の管理者は削除できません' });
       }
-      const admin = await db.get('SELECT * FROM admins WHERE id = ?', [req.params.id]);
+      const admin = await db.get('SELECT * FROM sm_admins WHERE id = ?', [req.params.id]);
       if (!admin) return res.status(404).json({ error: '管理者が見つかりません' });
-      await db.run('DELETE FROM admins WHERE id = ?', [req.params.id]);
+      await db.run('DELETE FROM sm_admins WHERE id = ?', [req.params.id]);
       res.json({ message: `管理者「${admin.display_name}」を削除しました` });
     } catch (error) {
       console.error('管理者削除エラー:', error);
@@ -429,10 +429,10 @@ function createAdminRoutes(db) {
       if (!new_password || new_password.length < 8) {
         return res.status(400).json({ error: 'パスワードは8文字以上にしてください' });
       }
-      const admin = await db.get('SELECT * FROM admins WHERE id = ?', [req.params.id]);
+      const admin = await db.get('SELECT * FROM sm_admins WHERE id = ?', [req.params.id]);
       if (!admin) return res.status(404).json({ error: '管理者が見つかりません' });
       const hash = bcrypt.hashSync(new_password, 10);
-      await db.run('UPDATE admins SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
+      await db.run('UPDATE sm_admins SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
       res.json({ message: `「${admin.display_name}」のパスワードを変更しました` });
     } catch (error) {
       console.error('パスワードリセットエラー:', error);

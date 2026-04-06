@@ -39,7 +39,7 @@ class PgDatabase {
 }
 
 const CREATE_TABLES = `
-  CREATE TABLE IF NOT EXISTS users (
+  CREATE TABLE IF NOT EXISTS sm_users (
     id TEXT PRIMARY KEY,
     email_hash TEXT NOT NULL UNIQUE,
     email_encrypted TEXT NOT NULL,
@@ -52,7 +52,7 @@ const CREATE_TABLES = `
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS reports (
+  CREATE TABLE IF NOT EXISTS sm_reports (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     latitude REAL NOT NULL,
@@ -68,10 +68,10 @@ const CREATE_TABLES = `
     admin_memo TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES sm_users(id)
   );
 
-  CREATE TABLE IF NOT EXISTS admins (
+  CREATE TABLE IF NOT EXISTS sm_admins (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -81,10 +81,10 @@ const CREATE_TABLES = `
 `;
 
 const CREATE_INDEXES = `
-  CREATE INDEX IF NOT EXISTS idx_reports_category ON reports(category);
-  CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
-  CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_reports_user_id ON reports(user_id);
+  CREATE INDEX IF NOT EXISTS idx_sm_reports_category ON sm_reports(category);
+  CREATE INDEX IF NOT EXISTS idx_sm_reports_status ON sm_reports(status);
+  CREATE INDEX IF NOT EXISTS idx_sm_reports_created_at ON sm_reports(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_sm_reports_user_id ON sm_reports(user_id);
 `;
 
 async function initDatabase() {
@@ -107,12 +107,12 @@ async function initDatabase() {
     await db.exec(CREATE_INDEXES);
 
     // マイグレーション
-    try { await db.exec("ALTER TABLE reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
-    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
 
     console.log('PostgreSQL に接続しました');
 
@@ -134,22 +134,22 @@ async function initDatabase() {
     await db.exec(CREATE_INDEXES);
 
     // マイグレーション
-    try { await db.exec("ALTER TABLE reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
-    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
-    try { await db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
 
     console.log('SQLite を使用しています');
   }
 
   // デフォルト管理者の作成
-  const adminExists = await db.get('SELECT COUNT(*) as count FROM admins');
+  const adminExists = await db.get('SELECT COUNT(*) as count FROM sm_admins');
   if (parseInt(adminExists.count) === 0) {
     const passwordHash = bcrypt.hashSync('admin2024!change_me', 10);
     await db.run(
-      'INSERT INTO admins (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)',
+      'INSERT INTO sm_admins (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)',
       [uuidv4(), 'admin', passwordHash, '管理者']
     );
     console.log('デフォルト管理者アカウントを作成しました。');

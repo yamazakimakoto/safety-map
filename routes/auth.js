@@ -53,11 +53,11 @@ function createAuthRoutes(db) {
       const { real_name, address, phone } = req.body;
 
       const emailHash = hashEmail(email);
-      const existing = await db.get('SELECT id, session_token FROM users WHERE email_hash = ?', [emailHash]);
+      const existing = await db.get('SELECT id, session_token FROM sm_users WHERE email_hash = ?', [emailHash]);
       if (existing) {
         const newToken = uuidv4();
-        await db.run('UPDATE users SET session_token = ? WHERE id = ?', [newToken, existing.id]);
-        const user = await db.get('SELECT id, display_name FROM users WHERE id = ?', [existing.id]);
+        await db.run('UPDATE sm_users SET session_token = ? WHERE id = ?', [newToken, existing.id]);
+        const user = await db.get('SELECT id, display_name FROM sm_users WHERE id = ?', [existing.id]);
         return res.json({
           message: '登録済みのメールアドレスです。ログインしました。',
           token: newToken,
@@ -70,7 +70,7 @@ function createAuthRoutes(db) {
       const encryptedEmail = encryptEmail(email);
 
       await db.run(
-        'INSERT INTO users (id, email_hash, email_encrypted, display_name, real_name, address, phone, session_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO sm_users (id, email_hash, email_encrypted, display_name, real_name, address, phone, session_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           userId, emailHash, encryptedEmail, sanitizedName,
           sanitizeHtml(real_name || '', { allowedTags: [], allowedAttributes: {} }),
@@ -100,13 +100,13 @@ function createAuthRoutes(db) {
       }
 
       const emailHash = hashEmail(email);
-      const user = await db.get('SELECT id, display_name FROM users WHERE email_hash = ?', [emailHash]);
+      const user = await db.get('SELECT id, display_name FROM sm_users WHERE email_hash = ?', [emailHash]);
       if (!user) {
         return res.status(404).json({ error: '登録されていないメールアドレスです。先にユーザー登録を行ってください。' });
       }
 
       const newToken = uuidv4();
-      await db.run('UPDATE users SET session_token = ? WHERE id = ?', [newToken, user.id]);
+      await db.run('UPDATE sm_users SET session_token = ? WHERE id = ?', [newToken, user.id]);
 
       res.json({
         message: 'ログインしました',
@@ -124,7 +124,7 @@ function createAuthRoutes(db) {
     try {
       const token = req.headers['x-user-token'];
       if (!token) return res.status(401).json({ error: '認証が必要です' });
-      const user = await db.get('SELECT id, email_encrypted, display_name, real_name, address, phone FROM users WHERE session_token = ?', [token]);
+      const user = await db.get('SELECT id, email_encrypted, display_name, real_name, address, phone FROM sm_users WHERE session_token = ?', [token]);
       if (!user) return res.status(401).json({ error: '認証エラー' });
       let email = '';
       try { email = decryptEmail(user.email_encrypted); } catch (e) {}
@@ -140,7 +140,7 @@ function createAuthRoutes(db) {
     try {
       const token = req.headers['x-user-token'];
       if (!token) return res.status(401).json({ error: '認証が必要です' });
-      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      const user = await db.get('SELECT id FROM sm_users WHERE session_token = ?', [token]);
       if (!user) return res.status(401).json({ error: '認証エラー' });
 
       const { display_name, real_name, address, phone } = req.body;
@@ -148,7 +148,7 @@ function createAuthRoutes(db) {
 
       const sanitizedName = sanitizeHtml(display_name, { allowedTags: [], allowedAttributes: {} });
       await db.run(
-        'UPDATE users SET display_name = ?, real_name = ?, address = ?, phone = ? WHERE id = ?',
+        'UPDATE sm_users SET display_name = ?, real_name = ?, address = ?, phone = ? WHERE id = ?',
         [
           sanitizedName,
           sanitizeHtml(real_name || '', { allowedTags: [], allowedAttributes: {} }),
@@ -173,7 +173,7 @@ function createAuthRoutes(db) {
       }
 
       const bcrypt = require('bcryptjs');
-      const admin = await db.get('SELECT * FROM admins WHERE username = ?', [username]);
+      const admin = await db.get('SELECT * FROM sm_admins WHERE username = ?', [username]);
       if (!admin || !bcrypt.compareSync(password, admin.password_hash)) {
         return res.status(401).json({ error: 'ユーザー名またはパスワードが正しくありません' });
       }
@@ -196,7 +196,7 @@ function createAuthRoutes(db) {
       if (!token) return res.status(401).json({ error: '管理者認証が必要です' });
 
       const bcrypt = require('bcryptjs');
-      const admin = await db.get('SELECT * FROM admins WHERE id = ?', [token]);
+      const admin = await db.get('SELECT * FROM sm_admins WHERE id = ?', [token]);
       if (!admin) return res.status(401).json({ error: '無効な管理者トークンです' });
 
       const { current_password, new_password } = req.body;
@@ -211,7 +211,7 @@ function createAuthRoutes(db) {
       }
 
       const newHash = bcrypt.hashSync(new_password, 10);
-      await db.run('UPDATE admins SET password_hash = ? WHERE id = ?', [newHash, admin.id]);
+      await db.run('UPDATE sm_admins SET password_hash = ? WHERE id = ?', [newHash, admin.id]);
       res.json({ message: 'パスワードを変更しました' });
     } catch (error) {
       console.error('パスワード変更エラー:', error);

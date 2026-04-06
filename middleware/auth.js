@@ -4,7 +4,7 @@ function adminAuth(db) {
     if (!token) {
       return res.status(401).json({ error: '管理者認証が必要です' });
     }
-    const admin = await db.get('SELECT * FROM admins WHERE id = ?', [token]);
+    const admin = await db.get('SELECT * FROM sm_admins WHERE id = ?', [token]);
     if (!admin) {
       return res.status(401).json({ error: '無効な管理者トークンです' });
     }
@@ -19,7 +19,7 @@ function userAuth(db) {
     if (!token) {
       return res.status(401).json({ error: 'ログインが必要です' });
     }
-    const user = await db.get('SELECT id, display_name FROM users WHERE session_token = ?', [token]);
+    const user = await db.get('SELECT id, display_name FROM sm_users WHERE session_token = ?', [token]);
     if (!user) {
       return res.status(401).json({ error: '無効なセッションです。再度ログインしてください。' });
     }
