@@ -104,6 +104,26 @@ function createReportRoutes(db) {
     }
   });
 
+  // 自分の投稿一覧（/:id より前に定義する必要あり）
+  router.get('/my', async (req, res) => {
+    try {
+      const token = req.headers['x-user-token'];
+      if (!token) return res.status(401).json({ error: 'ログインが必要です' });
+      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      if (!user) return res.status(401).json({ error: '無効なセッションです' });
+
+      const reports = await db.all(
+        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id
+         WHERE r.user_id = ? ORDER BY r.created_at DESC`,
+        [user.id]
+      );
+      res.json(reports);
+    } catch (error) {
+      console.error('マイ投稿取得エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
   // 投稿詳細
   router.get('/:id', async (req, res) => {
     try {
@@ -188,26 +208,6 @@ function createReportRoutes(db) {
       res.json({ message: '投稿が完了しました', report });
     } catch (error) {
       console.error('投稿エラー:', error);
-      res.status(500).json({ error: 'サーバーエラーが発生しました' });
-    }
-  });
-
-  // 自分の投稿一覧
-  router.get('/my', async (req, res) => {
-    try {
-      const token = req.headers['x-user-token'];
-      if (!token) return res.status(401).json({ error: 'ログインが必要です' });
-      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
-      if (!user) return res.status(401).json({ error: '無効なセッションです' });
-
-      const reports = await db.all(
-        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id
-         WHERE r.user_id = ? ORDER BY r.created_at DESC`,
-        [user.id]
-      );
-      res.json(reports);
-    } catch (error) {
-      console.error('マイ投稿取得エラー:', error);
       res.status(500).json({ error: 'サーバーエラーが発生しました' });
     }
   });
