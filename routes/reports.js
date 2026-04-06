@@ -5,10 +5,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const VALID_CATEGORIES = ['環境', '交通・道路', '災害', '防災', 'その他'];
+const VALID_CATEGORIES = ['環境', '交通・道路', '防犯', '防災', 'その他'];
 
 // エリアプリセット
 const AREA_PRESETS = {
+  '戸塚区・泉区': { name: '戸塚区・泉区', center: [35.3950, 139.5330], zoom: 14, minLat: 35.35, maxLat: 35.44, minLng: 139.48, maxLng: 139.58 },
   '横浜市': { name: '横浜市', center: [35.4437, 139.6380], zoom: 12, minLat: 35.30, maxLat: 35.60, minLng: 139.47, maxLng: 139.78 },
   '川崎市': { name: '川崎市', center: [35.5309, 139.7030], zoom: 12, minLat: 35.47, maxLat: 35.62, minLng: 139.59, maxLng: 139.78 },
   '相模原市': { name: '相模原市', center: [35.5714, 139.3734], zoom: 12, minLat: 35.47, maxLat: 35.68, minLng: 139.20, maxLng: 139.50 },
@@ -17,8 +18,8 @@ const AREA_PRESETS = {
   '全国': { name: '全国', center: [36.5, 138.0], zoom: 6, minLat: 24.0, maxLat: 46.0, minLng: 122.0, maxLng: 154.0 }
 };
 
-// 現在のエリア設定（デフォルト: 横浜市）
-let currentArea = { ...AREA_PRESETS['横浜市'] };
+// 現在のエリア設定（デフォルト: 戸塚区・泉区）
+let currentArea = { ...AREA_PRESETS['戸塚区・泉区'] };
 
 function getAreaBounds() { return currentArea; }
 function setArea(area) { currentArea = { ...area }; }

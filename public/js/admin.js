@@ -3,7 +3,7 @@ let adminName = localStorage.getItem('safetymap_admin_name');
 let allAdminReports = [];
 
 const CATEGORY_COLORS = {
-  '環境': '#4CAF50', '交通・道路': '#2196F3', '災害': '#F44336', '防災': '#FF9800', 'その他': '#9E9E9E'
+  '環境': '#4CAF50', '交通・道路': '#2196F3', '防犯': '#E91E63', '防災': '#FF9800', 'その他': '#9E9E9E'
 };
 const STATUS_MAP = { published: '公開', hidden: '非公開', resolved: '対応済' };
 
