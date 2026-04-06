@@ -88,6 +88,10 @@ async function loadAdminReports() {
 function renderReportsTable(reports) {
   const tbody = document.getElementById('reportsTable');
   if (!reports.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:40px">投稿がありません</td></tr>'; return; }
+  // レポートデータをグローバルに保持（編集・印刷で使用）
+  window._adminReports = {};
+  reports.forEach(r => { window._adminReports[r.id] = r; });
+
   tbody.innerHTML = reports.map(r => `
     <tr>
       <td><span class="report-category-badge" style="background:${CATEGORY_COLORS[r.category]||'#999'}">${esc(r.category)}</span></td>
@@ -97,7 +101,7 @@ function renderReportsTable(reports) {
       <td style="font-size:13px">${fmtDate(r.created_at)}</td>
       <td>
         <div class="admin-actions">
-          <button onclick="openEditModal('${r.id}','${escA(r.category)}','${escA(r.title)}','${escA(r.description||'')}','${r.status}','${escA(r.admin_status||'投稿')}','${escA(r.admin_memo||'')}')">編集</button>
+          <button onclick="openEditFromData('${r.id}')">編集</button>
           <button onclick="printReport('${r.id}')">印刷</button>
           <button class="delete" onclick="deleteReport('${r.id}')">削除</button>
         </div>
@@ -128,14 +132,16 @@ async function showAuthorDetail(userId) {
 }
 
 // 投稿編集
-function openEditModal(id, category, title, description, status, adminStatus, adminMemo) {
-  document.getElementById('editId').value = id;
-  document.getElementById('editCategory').value = category;
-  document.getElementById('editTitle').value = title;
-  document.getElementById('editDescription').value = description;
-  document.getElementById('editStatus').value = status;
-  document.getElementById('editAdminStatus').value = adminStatus || '投稿';
-  document.getElementById('editAdminMemo').value = adminMemo || '';
+function openEditFromData(id) {
+  const r = window._adminReports[id];
+  if (!r) { showToast('データが見つかりません', 'error'); return; }
+  document.getElementById('editId').value = r.id;
+  document.getElementById('editCategory').value = r.category;
+  document.getElementById('editTitle').value = r.title || '';
+  document.getElementById('editDescription').value = r.description || '';
+  document.getElementById('editStatus').value = r.status;
+  document.getElementById('editAdminStatus').value = r.admin_status || '投稿';
+  document.getElementById('editAdminMemo').value = r.admin_memo || '';
   document.getElementById('editModal').classList.remove('hidden');
 }
 
