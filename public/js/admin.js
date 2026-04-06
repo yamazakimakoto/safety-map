@@ -53,7 +53,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'users') loadAdminUsers();
   if (name === 'backup') loadBackupList();
-  if (name === 'settings') loadAreaSettings();
+  if (name === 'settings') { loadAreaSettings(); loadAdmins(); }
 }
 
 // === 統計 ===
@@ -437,6 +437,92 @@ async function changeArea() {
     if (!res.ok) throw new Error(data.error);
     showToast(data.message, 'success');
     document.getElementById('currentAreaName').textContent = data.area.name;
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// === 管理者アカウント管理 ===
+async function loadAdmins() {
+  try {
+    const res = await fetch('/api/admin/admins', { headers: { 'x-admin-token': adminToken } });
+    if (!res.ok) return;
+    const admins = await res.json();
+    document.getElementById('adminsTableBody').innerHTML = admins.map(a => `
+      <tr>
+        <td>${esc(a.username)}</td>
+        <td>${esc(a.display_name)}</td>
+        <td>${fmtDate(a.created_at)}</td>
+        <td>
+          <div class="admin-actions">
+            <button onclick="resetAdminPassword('${a.id}','${escA(a.display_name)}')">PW変更</button>
+            <button class="delete" onclick="deleteAdmin('${a.id}','${escA(a.display_name)}')">削除</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) { console.error(err); }
+}
+
+async function changeMyPassword() {
+  const current = document.getElementById('currentPw').value;
+  const newPw = document.getElementById('newPw').value;
+  if (!current || !newPw) { showToast('両方入力してください', 'error'); return; }
+  try {
+    const res = await fetch('/api/auth/admin/change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ current_password: current, new_password: newPw })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast(data.message, 'success');
+    document.getElementById('currentPw').value = '';
+    document.getElementById('newPw').value = '';
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function addAdmin() {
+  const username = document.getElementById('newAdminUsername').value;
+  const password = document.getElementById('newAdminPassword').value;
+  const display_name = document.getElementById('newAdminDisplayName').value;
+  if (!username || !password || !display_name) { showToast('全項目を入力してください', 'error'); return; }
+  try {
+    const res = await fetch('/api/admin/admins', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ username, password, display_name })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast(data.message, 'success');
+    document.getElementById('newAdminUsername').value = '';
+    document.getElementById('newAdminPassword').value = '';
+    document.getElementById('newAdminDisplayName').value = '';
+    loadAdmins();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function resetAdminPassword(id, name) {
+  const newPw = prompt(`「${name}」の新しいパスワードを入力（8文字以上）:`);
+  if (!newPw) return;
+  try {
+    const res = await fetch(`/api/admin/admins/${id}/reset-password`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ new_password: newPw })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast(data.message, 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteAdmin(id, name) {
+  if (!confirm(`管理者「${name}」を削除しますか？`)) return;
+  try {
+    const res = await fetch(`/api/admin/admins/${id}`, {
+      method: 'DELETE', headers: { 'x-admin-token': adminToken }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast(data.message, 'success');
+    loadAdmins();
   } catch (err) { showToast(err.message, 'error'); }
 }
 

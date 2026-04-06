@@ -203,6 +203,55 @@
         <button class="btn btn-primary" onclick="changeArea()">エリアを変更</button>
       </div>
 
+      <!-- 管理者アカウント管理 -->
+      <div class="backup-form">
+        <h3>管理者アカウント管理</h3>
+
+        <div style="margin-bottom:16px">
+          <h4 style="font-size:14px;margin-bottom:8px">自分のパスワード変更</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px">
+              <label>現在のパスワード</label>
+              <input type="password" id="currentPw">
+            </div>
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px">
+              <label>新しいパスワード（8文字以上）</label>
+              <input type="password" id="newPw">
+            </div>
+            <button class="btn btn-primary" onclick="changeMyPassword()" style="height:40px">変更</button>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0">
+
+        <h4 style="font-size:14px;margin-bottom:8px">管理者一覧</h4>
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table class="admin-table" id="adminsTable" style="font-size:13px">
+            <thead><tr><th>ユーザー名</th><th>表示名</th><th>登録日</th><th>操作</th></tr></thead>
+            <tbody id="adminsTableBody"></tbody>
+          </table>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0">
+
+        <h4 style="font-size:14px;margin-bottom:8px">新しい管理者を追加</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label>ユーザー名</label>
+            <input type="text" id="newAdminUsername" placeholder="username">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label>パスワード（8文字以上）</label>
+            <input type="password" id="newAdminPassword">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label>表示名</label>
+            <input type="text" id="newAdminDisplayName" placeholder="管理者名">
+          </div>
+          <button class="btn btn-primary" onclick="addAdmin()" style="height:40px">追加</button>
+        </div>
+      </div>
+
       <!-- データ初期化 -->
       <div class="backup-form" style="border:2px solid #ffcdd2">
         <h3 style="color:#F44336">データ初期化</h3>

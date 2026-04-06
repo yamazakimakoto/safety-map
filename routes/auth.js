@@ -189,6 +189,36 @@ function createAuthRoutes(db) {
     }
   });
 
+  // 管理者パスワード変更
+  router.post('/admin/change-password', async (req, res) => {
+    try {
+      const token = req.headers['x-admin-token'];
+      if (!token) return res.status(401).json({ error: '管理者認証が必要です' });
+
+      const bcrypt = require('bcryptjs');
+      const admin = await db.get('SELECT * FROM admins WHERE id = ?', [token]);
+      if (!admin) return res.status(401).json({ error: '無効な管理者トークンです' });
+
+      const { current_password, new_password } = req.body;
+      if (!current_password || !new_password) {
+        return res.status(400).json({ error: '現在のパスワードと新しいパスワードを入力してください' });
+      }
+      if (!bcrypt.compareSync(current_password, admin.password_hash)) {
+        return res.status(400).json({ error: '現在のパスワードが正しくありません' });
+      }
+      if (new_password.length < 8) {
+        return res.status(400).json({ error: '新しいパスワードは8文字以上にしてください' });
+      }
+
+      const newHash = bcrypt.hashSync(new_password, 10);
+      await db.run('UPDATE admins SET password_hash = ? WHERE id = ?', [newHash, admin.id]);
+      res.json({ message: 'パスワードを変更しました' });
+    } catch (error) {
+      console.error('パスワード変更エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
   return router;
 }
 

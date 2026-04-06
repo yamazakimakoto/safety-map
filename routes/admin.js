@@ -1,4 +1,6 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 const sanitizeHtml = require('sanitize-html');
 const { adminAuth } = require('../middleware/auth');
 const { decryptEmail } = require('./auth');
@@ -358,6 +360,82 @@ function createAdminRoutes(db) {
       res.json({ totalReports: totalReports.count, totalUsers: totalUsers.count, byCategory, byStatus });
     } catch (error) {
       console.error('統計情報取得エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // === 管理者アカウント管理 ===
+
+  // 管理者一覧
+  router.get('/admins', auth, async (req, res) => {
+    try {
+      const admins = await db.all('SELECT id, username, display_name, created_at FROM admins ORDER BY created_at');
+      res.json(admins);
+    } catch (error) {
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 管理者追加
+  router.post('/admins', auth, async (req, res) => {
+    try {
+      const { username, password, display_name } = req.body;
+      if (!username || !password || !display_name) {
+        return res.status(400).json({ error: 'ユーザー名、パスワード、表示名は必須です' });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'パスワードは8文字以上にしてください' });
+      }
+      const existing = await db.get('SELECT id FROM admins WHERE username = ?', [username]);
+      if (existing) {
+        return res.status(400).json({ error: 'そのユーザー名は既に使用されています' });
+      }
+      const id = uuidv4();
+      const hash = bcrypt.hashSync(password, 10);
+      const sanitizedName = sanitizeHtml(display_name, { allowedTags: [], allowedAttributes: {} });
+      await db.run('INSERT INTO admins (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)',
+        [id, sanitizeHtml(username, { allowedTags: [], allowedAttributes: {} }), hash, sanitizedName]);
+      res.json({ message: `管理者「${sanitizedName}」を追加しました` });
+    } catch (error) {
+      console.error('管理者追加エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 管理者削除
+  router.delete('/admins/:id', auth, async (req, res) => {
+    try {
+      if (req.params.id === req.admin.id) {
+        return res.status(400).json({ error: '自分自身は削除できません' });
+      }
+      const count = await db.get('SELECT COUNT(*) as count FROM admins');
+      if (parseInt(count.count) <= 1) {
+        return res.status(400).json({ error: '最後の管理者は削除できません' });
+      }
+      const admin = await db.get('SELECT * FROM admins WHERE id = ?', [req.params.id]);
+      if (!admin) return res.status(404).json({ error: '管理者が見つかりません' });
+      await db.run('DELETE FROM admins WHERE id = ?', [req.params.id]);
+      res.json({ message: `管理者「${admin.display_name}」を削除しました` });
+    } catch (error) {
+      console.error('管理者削除エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 管理者パスワードリセット（他の管理者のパスワードを変更）
+  router.put('/admins/:id/reset-password', auth, async (req, res) => {
+    try {
+      const { new_password } = req.body;
+      if (!new_password || new_password.length < 8) {
+        return res.status(400).json({ error: 'パスワードは8文字以上にしてください' });
+      }
+      const admin = await db.get('SELECT * FROM admins WHERE id = ?', [req.params.id]);
+      if (!admin) return res.status(404).json({ error: '管理者が見つかりません' });
+      const hash = bcrypt.hashSync(new_password, 10);
+      await db.run('UPDATE admins SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
+      res.json({ message: `「${admin.display_name}」のパスワードを変更しました` });
+    } catch (error) {
+      console.error('パスワードリセットエラー:', error);
       res.status(500).json({ error: 'サーバーエラーが発生しました' });
     }
   });
