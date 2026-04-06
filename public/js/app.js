@@ -68,6 +68,37 @@ function initMap() {
 
   map.addLayer(markers);
 
+  // 現在位置表示
+  let locationMarker = null;
+  let locationCircle = null;
+
+  map.on('locationfound', (e) => {
+    const radius = e.accuracy / 2;
+    if (locationMarker) { map.removeLayer(locationMarker); map.removeLayer(locationCircle); }
+    locationMarker = L.marker(e.latlng, {
+      icon: L.divIcon({
+        className: 'location-marker',
+        html: '<div style="width:16px;height:16px;background:#4285F4;border:3px solid white;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6)"></div>',
+        iconSize: [16, 16], iconAnchor: [8, 8]
+      })
+    }).addTo(map).bindPopup('現在地');
+    locationCircle = L.circle(e.latlng, { radius, color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.1, weight: 1 }).addTo(map);
+  });
+
+  map.on('locationerror', (e) => {
+    showToast('位置情報を取得できませんでした', 'error');
+  });
+
+  // 現在位置ボタンを追加
+  const locBtn = L.control({ position: 'topleft' });
+  locBtn.onAdd = function() {
+    const div = L.DomUtil.create('div', 'leaflet-bar');
+    div.innerHTML = '<a href="#" title="現在地を表示" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:white;font-size:18px;text-decoration:none;color:#333" onclick="locateMe();return false;">📍</a>';
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  locBtn.addTo(map);
+
   // タイル読み込み後にサイズ再計算（Safari対応）
   map.whenReady(() => { map.invalidateSize(); });
   setTimeout(() => { map.invalidateSize(); }, 100);
@@ -624,6 +655,11 @@ async function deleteMyReport(id) {
 
 function escapeAttr(s) {
   return (s || '').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
+// === 現在位置 ===
+function locateMe() {
+  map.locate({ setView: true, maxZoom: 17, enableHighAccuracy: true });
 }
 
 // === ユーティリティ ===
