@@ -311,8 +311,16 @@ async function printReport(id) {
 
     const memoSummary = (r.admin_memo || '').substring(0, 300);
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`<!DOCTYPE html>
+    // iframe方式で印刷（ポップアップブロッカー対策）
+    let printFrame = document.getElementById('printFrame');
+    if (printFrame) printFrame.remove();
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'printFrame';
+    printFrame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;border:none;background:white;';
+    document.body.appendChild(printFrame);
+    const printDoc = printFrame.contentDocument || printFrame.contentWindow.document;
+    printDoc.open();
+    printDoc.write(`<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -378,10 +386,19 @@ async function printReport(id) {
 
   <div class="footer">投稿ID: ${r.id} | 印刷日: ${new Date().toLocaleDateString('ja-JP')}</div>
 </div>
-<script>window.onload = function() { window.print(); }</script>
+<script>
+window.onload = function() {
+  window.print();
+  // 印刷ダイアログ後にiframeを閉じる
+  setTimeout(function() {
+    var frame = window.parent.document.getElementById('printFrame');
+    if (frame) frame.remove();
+  }, 1000);
+};
+</script>
 </body>
 </html>`);
-    printWindow.document.close();
+    printDoc.close();
   } catch (err) { showToast(err.message, 'error'); }
 }
 
