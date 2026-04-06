@@ -576,6 +576,11 @@ body {
     padding: 4px 6px;
     gap: 2px;
     -webkit-overflow-scrolling: touch;
+    z-index: 500;
+  }
+
+  .leaflet-top.leaflet-left {
+    top: 50px;
   }
 
   .filter-btn {
