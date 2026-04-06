@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>街の安全安心マップ</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header class="header">
+    <h1>街の安全安心マップ</h1>
+    <div class="header-actions">
+      <span class="user-info" id="userInfo"></span>
+      <button id="authBtn">ログイン</button>
+    </div>
+  </header>
+
+  <!-- カテゴリーフィルター -->
+  <div class="filter-bar" id="filterBar">
+    <button class="filter-btn active" data-category="all">すべて</button>
+    <button class="filter-btn" data-category="環境" style="--dot-color:#4CAF50">環境</button>
+    <button class="filter-btn" data-category="交通・道路" style="--dot-color:#2196F3">交通・道路</button>
+    <button class="filter-btn" data-category="災害" style="--dot-color:#F44336">災害</button>
+    <button class="filter-btn" data-category="防災" style="--dot-color:#FF9800">防災</button>
+    <button class="filter-btn" data-category="その他" style="--dot-color:#9E9E9E">その他</button>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div class="main-container">
+    <div id="map"></div>
+
+    <!-- サイドパネル（投稿詳細表示） -->
+    <div class="side-panel hidden" id="sidePanel">
+      <div class="panel-header">
+        <h2 id="panelTitle">投稿詳細</h2>
+        <button class="panel-close" onclick="closeSidePanel()">&times;</button>
+      </div>
+      <div class="panel-body" id="panelBody"></div>
+    </div>
+  </div>
+
+  <!-- 認証モーダル -->
+  <div class="modal-overlay hidden" id="authModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>街の安全安心マップ</h2>
+        <p>地域の安心安全情報を共有しましょう</p>
+      </div>
+      <div class="modal-body">
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="switchAuthTab('login')">ログイン</button>
+          <button class="auth-tab" onclick="switchAuthTab('register')">新規登録</button>
+        </div>
+
+        <!-- ログインフォーム -->
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label>メールアドレス</label>
+            <input type="email" id="loginEmail" required placeholder="example@email.com">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">ログイン</button>
+        </form>
+
+        <!-- 登録フォーム -->
+        <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label>メールアドレス <span style="color:#F44336">*</span></label>
+            <input type="email" id="regEmail" required placeholder="example@email.com">
+          </div>
+          <div class="form-group">
+            <label>メールアドレス（確認） <span style="color:#F44336">*</span></label>
+            <input type="email" id="regEmailConfirm" required placeholder="もう一度入力してください">
+          </div>
+          <div class="form-group">
+            <label>表示名 <span style="color:#F44336">*</span></label>
+            <input type="text" id="regName" required placeholder="表示名を入力" maxlength="50">
+          </div>
+          <div class="form-group">
+            <label>本名（任意）</label>
+            <input type="text" id="regRealName" placeholder="山田 太郎" maxlength="50">
+          </div>
+          <div class="form-group">
+            <label>住所（任意）</label>
+            <input type="text" id="regAddress" placeholder="横浜市戸塚区...">
+          </div>
+          <div class="form-group">
+            <label>電話番号（任意）</label>
+            <input type="tel" id="regPhone" placeholder="090-1234-5678">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">登録する</button>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAuthModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投稿モーダル -->
+  <div class="modal-overlay hidden" id="reportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>新しい投稿</h2>
+        <p>地図上で選択した地点の情報を登録します</p>
+      </div>
+      <div class="modal-body">
+        <form id="reportForm" onsubmit="handleSubmitReport(event)">
+          <div class="form-group">
+            <label>カテゴリー</label>
+            <div class="category-select" id="categorySelect">
+              <label class="category-option" data-category="環境">
+                <input type="radio" name="category" value="環境">
+                <span class="category-dot" style="background:#4CAF50"></span>
+                環境
+              </label>
+              <label class="category-option" data-category="交通・道路">
+                <input type="radio" name="category" value="交通・道路">
+                <span class="category-dot" style="background:#2196F3"></span>
+                交通・道路
+              </label>
+              <label class="category-option" data-category="災害">
+                <input type="radio" name="category" value="災害">
+                <span class="category-dot" style="background:#F44336"></span>
+                災害
+              </label>
+              <label class="category-option" data-category="防災">
+                <input type="radio" name="category" value="防災">
+                <span class="category-dot" style="background:#FF9800"></span>
+                防災
+              </label>
+              <label class="category-option" data-category="その他">
+                <input type="radio" name="category" value="その他">
+                <span class="category-dot" style="background:#9E9E9E"></span>
+                その他
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>タイトル</label>
+            <input type="text" id="reportTitle" required placeholder="例：道路の陥没" maxlength="100">
+          </div>
+          <div class="form-group">
+            <label>詳細メモ</label>
+            <textarea id="reportDescription" placeholder="状況を詳しく記述してください" rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label>写真（最大2枚）</label>
+            <div class="photo-upload">
+              <div class="photo-slot" id="photoSlot1" onclick="document.getElementById('photoInput1').click()">
+                <div class="placeholder">写真1</div>
+                <button type="button" class="remove-photo" onclick="removePhoto(event, 1)">&times;</button>
+              </div>
+              <div class="photo-slot" id="photoSlot2" onclick="document.getElementById('photoInput2').click()">
+                <div class="placeholder">写真2</div>
+                <button type="button" class="remove-photo" onclick="removePhoto(event, 2)">&times;</button>
+              </div>
+            </div>
+            <input type="file" id="photoInput1" accept="image/*" style="display:none" onchange="previewPhoto(this, 1)">
+            <input type="file" id="photoInput2" accept="image/*" style="display:none" onchange="previewPhoto(this, 2)">
+          </div>
+          <input type="hidden" id="reportLat">
+          <input type="hidden" id="reportLng">
+          <button type="submit" class="btn btn-primary btn-block" id="submitBtn">投稿する</button>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeReportModal()">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理者画面 - 街の安全安心マップ</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .tabs { display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 20px; overflow-x: auto; }
+    .tab { padding: 10px 20px; border: none; background: none; font-size: 14px; font-weight: 600;
+           color: #666; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+    .tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .detail-label { width: 120px; font-weight: 600; color: #666; flex-shrink: 0; }
+    .detail-value { flex: 1; }
+    .backup-form { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .backup-form h3 { font-size: 16px; margin-bottom: 16px; }
+    .backup-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+    .backup-row .form-group { margin-bottom: 0; flex: 1; min-width: 150px; }
+    .checkbox-list { max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; }
+    .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+    .checkbox-item:last-child { border-bottom: none; }
+    .checkbox-item input[type="checkbox"] { flex-shrink: 0; }
+    @media (max-width: 768px) {
+      .admin-layout { padding: 12px; }
+      .admin-table { font-size: 12px; }
+      .admin-table th, .admin-table td { padding: 8px 6px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .backup-row { flex-direction: column; }
+      .tabs { gap: 0; }
+      .tab { padding: 8px 12px; font-size: 13px; }
+      .modal { margin: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>安全安心マップ 管理</h1>
+    <div class="header-actions">
+      <a href="/" style="color:white;text-decoration:none;font-size:13px">マップ</a>
+      <span class="user-info" id="adminInfo"></span>
+      <button id="adminLogoutBtn" onclick="adminLogout()" style="display:none">ログアウト</button>
+    </div>
+  </header>
+
+  <!-- ログイン -->
+  <div class="auth-container" id="adminLoginSection">
+    <div class="auth-card">
+      <h2>管理者ログイン</h2>
+      <p>管理者アカウントでログインしてください</p>
+      <form onsubmit="handleAdminLogin(event)">
+        <div class="form-group">
+          <label>ユーザー名</label>
+          <input type="text" id="adminUsername" required>
+        </div>
+        <div class="form-group">
+          <label>パスワード</label>
+          <input type="password" id="adminPassword" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">ログイン</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ダッシュボード -->
+  <div class="admin-layout" id="adminDashboard" style="display:none">
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- タブ -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('reports')">投稿管理</button>
+      <button class="tab" onclick="switchTab('users')">ユーザー管理</button>
+      <button class="tab" onclick="switchTab('backup')">バックアップ</button>
+      <button class="tab" onclick="switchTab('settings')">設定</button>
+    </div>
+
+    <!-- 投稿管理タブ -->
+    <div class="tab-content active" id="tab-reports">
+      <div style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap">
+        <select id="filterCategory" onchange="loadAdminReports()" style="padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px">
+          <option value="">全カテゴリー</option>
+          <option value="環境">環境</option>
+          <option value="交通・道路">交通・道路</option>
+          <option value="災害">災害</option>
+          <option value="防災">防災</option>
+          <option value="その他">その他</option>
+        </select>
+        <select id="filterStatus" onchange="loadAdminReports()" style="padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px">
+          <option value="">全ステータス</option>
+          <option value="published">公開</option>
+          <option value="hidden">非公開</option>
+          <option value="resolved">対応済</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>カテゴリー</th>
+              <th>タイトル</th>
+              <th>投稿者</th>
+              <th>ステータス</th>
+              <th>投稿日</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="reportsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ユーザー管理タブ -->
+    <div class="tab-content" id="tab-users">
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>表示名</th>
+              <th>本名</th>
+              <th>メール</th>
+              <th>電話番号</th>
+              <th>投稿数</th>
+              <th>登録日</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- バックアップタブ -->
+    <div class="tab-content" id="tab-backup">
+      <div class="backup-form">
+        <h3>投稿データバックアップ（CSV）</h3>
+        <p style="font-size:13px;color:#666;margin-bottom:16px">Googleマップ座標付きのCSVファイルをダウンロードします</p>
+        <div class="backup-row">
+          <div class="form-group">
+            <label>カテゴリー</label>
+            <select id="backupCategory">
+              <option value="">すべて</option>
+              <option value="環境">環境</option>
+              <option value="交通・道路">交通・道路</option>
+              <option value="災害">災害</option>
+              <option value="防災">防災</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ステータス</label>
+            <select id="backupStatus">
+              <option value="">すべて</option>
+              <option value="published">公開</option>
+              <option value="hidden">非公開</option>
+              <option value="resolved">対応済</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>開始日</label>
+            <input type="date" id="backupDateFrom">
+          </div>
+          <div class="form-group">
+            <label>終了日</label>
+            <input type="date" id="backupDateTo">
+          </div>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="backupSelectMode" onchange="toggleBackupSelect()"> 投稿を個別に選択する</label>
+        </div>
+        <div id="backupSelectList" style="display:none;margin-bottom:16px">
+          <div style="margin-bottom:8px">
+            <button class="btn btn-secondary" onclick="toggleAllBackup(true)" style="padding:4px 12px;font-size:12px">全選択</button>
+            <button class="btn btn-secondary" onclick="toggleAllBackup(false)" style="padding:4px 12px;font-size:12px">全解除</button>
+          </div>
+          <div class="checkbox-list" id="backupCheckboxes"></div>
+        </div>
+        <button class="btn btn-primary" onclick="downloadBackup('reports')">投稿データをダウンロード</button>
+      </div>
+
+      <div class="backup-form">
+        <h3>ユーザーデータバックアップ（CSV）</h3>
+        <button class="btn btn-primary" onclick="downloadBackup('users')">ユーザーデータをダウンロード</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- 設定タブ -->
+    <div class="tab-content" id="tab-settings">
+      <!-- エリア設定 -->
+      <div class="backup-form">
+        <h3>地図エリア設定</h3>
+        <p style="font-size:13px;color:#666;margin-bottom:16px">地図の表示範囲と投稿可能エリアを設定します</p>
+        <div class="form-group">
+          <label>現在のエリア: <strong id="currentAreaName">-</strong></label>
+        </div>
+        <div class="form-group">
+          <label>プリセットから選択</label>
+          <select id="areaPreset" style="padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px;width:100%">
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="changeArea()">エリアを変更</button>
+      </div>
+
+      <!-- データ初期化 -->
+      <div class="backup-form" style="border:2px solid #ffcdd2">
+        <h3 style="color:#F44336">データ初期化</h3>
+        <p style="font-size:13px;color:#666;margin-bottom:16px">この操作は取り消せません。事前にバックアップを取ることを推奨します。</p>
+
+        <div style="margin-bottom:16px;padding:16px;background:#fff8f8;border-radius:6px">
+          <p style="font-weight:600;margin-bottom:8px">投稿データの初期化</p>
+          <p style="font-size:13px;color:#666;margin-bottom:12px">全投稿データを削除します。ユーザーデータは保持されます。</p>
+          <button class="btn btn-danger" onclick="resetData('reports')">投稿データを初期化</button>
+        </div>
+
+        <div style="padding:16px;background:#fff8f8;border-radius:6px">
+          <p style="font-weight:600;margin-bottom:8px">全データの初期化</p>
+          <p style="font-size:13px;color:#666;margin-bottom:12px">全ユーザーと全投稿データを削除します。</p>
+          <button class="btn btn-danger" onclick="resetData('users')">全データを初期化</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投稿編集モーダル -->
+  <div class="modal-overlay hidden" id="editModal">
+    <div class="modal">
+      <div class="modal-header"><h2>投稿を編集</h2></div>
+      <div class="modal-body">
+        <form id="editForm" onsubmit="handleEditReport(event)">
+          <input type="hidden" id="editId">
+          <div class="form-group">
+            <label>カテゴリー</label>
+            <select id="editCategory"><option value="環境">環境</option><option value="交通・道路">交通・道路</option><option value="災害">災害</option><option value="防災">防災</option><option value="その他">その他</option></select>
+          </div>
+          <div class="form-group"><label>タイトル</label><input type="text" id="editTitle" required></div>
+          <div class="form-group"><label>詳細</label><textarea id="editDescription" rows="4"></textarea></div>
+          <div class="form-group">
+            <label>ステータス</label>
+            <select id="editStatus"><option value="published">公開</option><option value="hidden">非公開</option><option value="resolved">対応済</option></select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">更新する</button>
+        </form>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('editModal')">キャンセル</button></div>
+    </div>
+  </div>
+
+  <!-- 投稿者詳細モーダル -->
+  <div class="modal-overlay hidden" id="authorModal">
+    <div class="modal">
+      <div class="modal-header"><h2>投稿者情報</h2></div>
+      <div class="modal-body" id="authorDetail"></div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('authorModal')">閉じる</button></div>
+    </div>
+  </div>
+
+  <!-- ユーザー編集モーダル -->
+  <div class="modal-overlay hidden" id="userEditModal">
+    <div class="modal">
+      <div class="modal-header"><h2>ユーザー情報を編集</h2></div>
+      <div class="modal-body">
+        <form id="userEditForm" onsubmit="handleEditUser(event)">
+          <input type="hidden" id="userEditId">
+          <div class="form-group"><label>表示名</label><input type="text" id="userEditName" required></div>
+          <div class="form-group"><label>本名</label><input type="text" id="userEditRealName"></div>
+          <div class="form-group"><label>住所</label><input type="text" id="userEditAddress"></div>
+          <div class="form-group"><label>電話番号</label><input type="tel" id="userEditPhone"></div>
+          <button type="submit" class="btn btn-primary btn-block">更新する</button>
+        </form>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('userEditModal')">キャンセル</button></div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

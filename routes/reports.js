@@ -1,0 +1,197 @@
+const express = require('express');
+const { v4: uuidv4 } = require('uuid');
+const sanitizeHtml = require('sanitize-html');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const VALID_CATEGORIES = ['環境', '交通・道路', '災害', '防災', 'その他'];
+
+// エリアプリセット
+const AREA_PRESETS = {
+  '横浜市': { name: '横浜市', center: [35.4437, 139.6380], zoom: 12, minLat: 35.30, maxLat: 35.60, minLng: 139.47, maxLng: 139.78 },
+  '川崎市': { name: '川崎市', center: [35.5309, 139.7030], zoom: 12, minLat: 35.47, maxLat: 35.62, minLng: 139.59, maxLng: 139.78 },
+  '相模原市': { name: '相模原市', center: [35.5714, 139.3734], zoom: 12, minLat: 35.47, maxLat: 35.68, minLng: 139.20, maxLng: 139.50 },
+  '神奈川県': { name: '神奈川県', center: [35.4478, 139.3425], zoom: 10, minLat: 35.10, maxLat: 35.68, minLng: 138.90, maxLng: 139.80 },
+  '東京都': { name: '東京都', center: [35.6812, 139.7671], zoom: 11, minLat: 35.50, maxLat: 35.90, minLng: 139.40, maxLng: 139.95 },
+  '全国': { name: '全国', center: [36.5, 138.0], zoom: 6, minLat: 24.0, maxLat: 46.0, minLng: 122.0, maxLng: 154.0 }
+};
+
+// 現在のエリア設定（デフォルト: 横浜市）
+let currentArea = { ...AREA_PRESETS['横浜市'] };
+
+function getAreaBounds() { return currentArea; }
+function setArea(area) { currentArea = { ...area }; }
+
+function isWithinArea(lat, lng) {
+  return lat >= currentArea.minLat && lat <= currentArea.maxLat &&
+         lng >= currentArea.minLng && lng <= currentArea.maxLng;
+}
+
+// multer設定（一時ファイル保存）
+const upload = multer({
+  dest: path.join(__dirname, '..', 'uploads'),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    cb(null, allowed.includes(file.mimetype));
+  }
+});
+
+function createReportRoutes(db) {
+  const router = express.Router();
+
+  // Cloudinary設定
+  let cloudinary = null;
+  if (process.env.CLOUDINARY_URL || process.env.CLOUDINARY_CLOUD_NAME) {
+    cloudinary = require('cloudinary').v2;
+    if (!process.env.CLOUDINARY_URL) {
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+      });
+    }
+  }
+
+  async function uploadToCloudinary(filePath) {
+    if (!cloudinary) {
+      // Cloudinary未設定時はローカルパスを返す
+      return '/uploads/' + path.basename(filePath);
+    }
+    try {
+      const result = await cloudinary.uploader.upload(filePath, {
+        folder: 'safety-map',
+        transformation: [{ width: 1200, height: 1200, crop: 'limit' }, { quality: 'auto' }]
+      });
+      // 一時ファイル削除
+      fs.unlink(filePath, () => {});
+      return result.secure_url;
+    } catch (err) {
+      console.error('Cloudinaryアップロードエラー:', err);
+      fs.unlink(filePath, () => {});
+      throw err;
+    }
+  }
+
+  // エリア設定取得
+  router.get('/area', (req, res) => {
+    res.json({ area: getAreaBounds(), presets: AREA_PRESETS });
+  });
+
+  // 全投稿取得（公開のみ）
+  router.get('/', async (req, res) => {
+    try {
+      const { category } = req.query;
+      let sql = `SELECT r.*, u.display_name as author_name
+                 FROM reports r JOIN users u ON r.user_id = u.id
+                 WHERE r.status = 'published'`;
+      const params = [];
+
+      if (category && VALID_CATEGORIES.includes(category)) {
+        sql += ' AND r.category = ?';
+        params.push(category);
+      }
+
+      sql += ' ORDER BY r.created_at DESC';
+
+      const reports = await db.all(sql, params);
+      res.json(reports);
+    } catch (error) {
+      console.error('投稿取得エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 投稿詳細
+  router.get('/:id', async (req, res) => {
+    try {
+      const report = await db.get(
+        `SELECT r.*, u.display_name as author_name
+         FROM reports r JOIN users u ON r.user_id = u.id
+         WHERE r.id = ?`,
+        [req.params.id]
+      );
+      if (!report) {
+        return res.status(404).json({ error: '投稿が見つかりません' });
+      }
+      res.json(report);
+    } catch (error) {
+      console.error('投稿詳細取得エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 新規投稿（認証必須）
+  router.post('/', upload.array('photos', 2), async (req, res) => {
+    try {
+      const token = req.headers['x-user-token'];
+      if (!token) {
+        return res.status(401).json({ error: 'ログインが必要です' });
+      }
+      const user = await db.get('SELECT id, display_name FROM users WHERE session_token = ?', [token]);
+      if (!user) {
+        return res.status(401).json({ error: '無効なセッションです' });
+      }
+
+      const { latitude, longitude, category, title, description } = req.body;
+
+      if (!latitude || !longitude || !category || !title) {
+        return res.status(400).json({ error: '位置情報、カテゴリー、タイトルは必須です' });
+      }
+
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ error: '無効な位置情報です' });
+      }
+
+      if (!isWithinArea(lat, lng)) {
+        return res.status(400).json({ error: `${currentArea.name}の範囲外です。${currentArea.name}内の位置を選択してください。` });
+      }
+
+      if (!VALID_CATEGORIES.includes(category)) {
+        return res.status(400).json({ error: '無効なカテゴリーです' });
+      }
+
+      const sanitizedTitle = sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} });
+      const sanitizedDesc = sanitizeHtml(description || '', { allowedTags: [], allowedAttributes: {} });
+
+      // 写真アップロード
+      let photo1_url = '';
+      let photo2_url = '';
+      if (req.files && req.files.length > 0) {
+        photo1_url = await uploadToCloudinary(req.files[0].path);
+        if (req.files.length > 1) {
+          photo2_url = await uploadToCloudinary(req.files[1].path);
+        }
+      }
+
+      const reportId = uuidv4();
+      const now = new Date().toISOString();
+
+      await db.run(
+        `INSERT INTO reports (id, user_id, latitude, longitude, category, title, description, photo1_url, photo2_url, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?)`,
+        [reportId, user.id, lat, lng, category, sanitizedTitle, sanitizedDesc, photo1_url, photo2_url, now, now]
+      );
+
+      const report = await db.get(
+        `SELECT r.*, u.display_name as author_name
+         FROM reports r JOIN users u ON r.user_id = u.id
+         WHERE r.id = ?`,
+        [reportId]
+      );
+
+      res.json({ message: '投稿が完了しました', report });
+    } catch (error) {
+      console.error('投稿エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  return router;
+}
+
+module.exports = { createReportRoutes, VALID_CATEGORIES, AREA_PRESETS, getAreaBounds, setArea };

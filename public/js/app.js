@@ -1,0 +1,467 @@
+// === 設定（APIから上書き） ===
+let MAP_CENTER = [35.4437, 139.6380];
+let MAP_ZOOM = 12;
+let MAP_BOUNDS = [[35.30, 139.47], [35.60, 139.78]]; // 横浜市範囲
+
+const CATEGORY_COLORS = {
+  '環境': '#4CAF50',
+  '交通・道路': '#2196F3',
+  '災害': '#F44336',
+  '防災': '#FF9800',
+  'その他': '#9E9E9E'
+};
+
+const STATUS_LABELS = {
+  'published': '公開',
+  'hidden': '非公開',
+  'resolved': '対応済'
+};
+
+// === 状態管理 ===
+let map;
+let markers = L.markerClusterGroup();
+let allReports = [];
+let currentFilter = 'all';
+let tempMarker = null;
+let userToken = localStorage.getItem('safetymap_token');
+let userName = localStorage.getItem('safetymap_name');
+
+// === 初期化 ===
+document.addEventListener('DOMContentLoaded', async () => {
+  // エリア設定をサーバーから取得
+  try {
+    const res = await fetch('/api/reports/area');
+    if (res.ok) {
+      const data = await res.json();
+      const a = data.area;
+      MAP_CENTER = a.center;
+      MAP_ZOOM = a.zoom;
+      MAP_BOUNDS = [[a.minLat, a.minLng], [a.maxLat, a.maxLng]];
+    }
+  } catch (e) { console.warn('エリア設定取得失敗、デフォルト使用'); }
+
+  initMap();
+  initFilters();
+  loadReports();
+  updateAuthUI();
+});
+
+function initMap() {
+  map = L.map('map', {
+    center: MAP_CENTER,
+    zoom: MAP_ZOOM,
+    maxBounds: L.latLngBounds(MAP_BOUNDS[0], MAP_BOUNDS[1]),
+    maxBoundsViscosity: 0.8,
+    minZoom: 11
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+
+  map.addLayer(markers);
+
+  // タイル読み込み後にサイズ再計算（Safari対応）
+  map.whenReady(() => { map.invalidateSize(); });
+  setTimeout(() => { map.invalidateSize(); }, 100);
+  setTimeout(() => { map.invalidateSize(); }, 500);
+  setTimeout(() => { map.invalidateSize(); }, 1500);
+  window.addEventListener('resize', () => { map.invalidateSize(); });
+  window.addEventListener('load', () => { map.invalidateSize(); });
+
+  // 地図クリックで投稿
+  map.on('click', (e) => {
+    if (!userToken) {
+      showToast('投稿するにはログインが必要です', 'error');
+      showAuthModal();
+      return;
+    }
+
+    const { lat, lng } = e.latlng;
+
+    // エリアチェック
+    if (lat < MAP_BOUNDS[0][0] || lat > MAP_BOUNDS[1][0] ||
+        lng < MAP_BOUNDS[0][1] || lng > MAP_BOUNDS[1][1]) {
+      showToast('横浜市の範囲内を選択してください', 'error');
+      return;
+    }
+
+    // 一時マーカー
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([lat, lng], {
+      icon: createIcon('#1a73e8'),
+      opacity: 0.7
+    }).addTo(map);
+
+    document.getElementById('reportLat').value = lat;
+    document.getElementById('reportLng').value = lng;
+    openReportModal();
+  });
+}
+
+// カスタムマーカーアイコン
+function createIcon(color) {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.27 21.73 0 14 0z" fill="${color}" stroke="white" stroke-width="2"/>
+      <circle cx="14" cy="14" r="6" fill="white"/>
+    </svg>`,
+    iconSize: [28, 40],
+    iconAnchor: [14, 40],
+    popupAnchor: [0, -40]
+  });
+}
+
+// === フィルター ===
+function initFilters() {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.category;
+      renderMarkers();
+    });
+  });
+}
+
+// === データ読み込み ===
+async function loadReports() {
+  try {
+    const res = await fetch('/api/reports');
+    if (!res.ok) throw new Error('データ取得エラー');
+    allReports = await res.json();
+    renderMarkers();
+  } catch (err) {
+    console.error(err);
+    showToast('データの読み込みに失敗しました', 'error');
+  }
+}
+
+function renderMarkers() {
+  markers.clearLayers();
+
+  const filtered = currentFilter === 'all'
+    ? allReports
+    : allReports.filter(r => r.category === currentFilter);
+
+  filtered.forEach(report => {
+    const color = CATEGORY_COLORS[report.category] || '#9E9E9E';
+    const marker = L.marker([report.latitude, report.longitude], {
+      icon: createIcon(color)
+    });
+
+    // ポップアップ
+    let photoHtml = '';
+    if (report.photo1_url) {
+      photoHtml += `<img src="${escapeHtml(report.photo1_url)}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;margin-top:6px;">`;
+    }
+    if (report.photo2_url) {
+      photoHtml += `<img src="${escapeHtml(report.photo2_url)}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;margin-top:6px;margin-left:4px;">`;
+    }
+
+    marker.bindPopup(`
+      <div style="min-width:200px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="background:${color};color:white;padding:1px 8px;border-radius:10px;font-size:11px">${escapeHtml(report.category)}</span>
+        </div>
+        <strong style="font-size:14px">${escapeHtml(report.title)}</strong>
+        ${report.description ? `<p style="font-size:13px;margin:6px 0;color:#555">${escapeHtml(report.description).substring(0, 100)}</p>` : ''}
+        <div style="display:flex;gap:4px">${photoHtml}</div>
+        <div style="font-size:11px;color:#999;margin-top:6px">
+          ${escapeHtml(report.author_name)} / ${formatDate(report.created_at)}
+        </div>
+        <button onclick="showReportDetail('${report.id}')" style="margin-top:8px;padding:4px 12px;background:#1a73e8;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">詳細を見る</button>
+      </div>
+    `);
+
+    markers.addLayer(marker);
+  });
+}
+
+// === 投稿詳細 ===
+function showReportDetail(id) {
+  const report = allReports.find(r => r.id === id);
+  if (!report) return;
+
+  const panel = document.getElementById('sidePanel');
+  const body = document.getElementById('panelBody');
+  const color = CATEGORY_COLORS[report.category] || '#9E9E9E';
+
+  let photos = '';
+  if (report.photo1_url) {
+    photos += `<img src="${escapeHtml(report.photo1_url)}" style="width:100%;border-radius:8px;margin-bottom:8px">`;
+  }
+  if (report.photo2_url) {
+    photos += `<img src="${escapeHtml(report.photo2_url)}" style="width:100%;border-radius:8px;margin-bottom:8px">`;
+  }
+
+  body.innerHTML = `
+    <div>
+      <span class="report-category-badge" style="background:${color}">${escapeHtml(report.category)}</span>
+      <span class="status-badge status-${report.status}" style="margin-left:6px">${STATUS_LABELS[report.status] || report.status}</span>
+    </div>
+    <h3 style="margin:12px 0 8px;font-size:18px">${escapeHtml(report.title)}</h3>
+    <p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px">${escapeHtml(report.description || '詳細なし')}</p>
+    ${photos}
+    <div style="font-size:13px;color:#999;margin-top:12px;padding-top:12px;border-top:1px solid #e0e0e0">
+      <div>投稿者: ${escapeHtml(report.author_name)}</div>
+      <div>投稿日: ${formatDate(report.created_at)}</div>
+      <div>位置: ${report.latitude.toFixed(6)}, ${report.longitude.toFixed(6)}</div>
+    </div>
+  `;
+
+  panel.classList.remove('hidden');
+  map.flyTo([report.latitude, report.longitude], 16, { duration: 0.5 });
+}
+
+function closeSidePanel() {
+  document.getElementById('sidePanel').classList.add('hidden');
+}
+
+// === 認証 ===
+function updateAuthUI() {
+  const info = document.getElementById('userInfo');
+  const oldBtn = document.getElementById('authBtn');
+  // onclick属性の競合を避けるためボタンを置換
+  const btn = oldBtn.cloneNode(false);
+  oldBtn.parentNode.replaceChild(btn, oldBtn);
+  btn.id = 'authBtn';
+
+  if (userToken && userName) {
+    info.textContent = userName;
+    btn.textContent = 'ログアウト';
+    btn.addEventListener('click', handleLogout);
+  } else {
+    info.textContent = '';
+    btn.textContent = 'ログイン';
+    btn.addEventListener('click', showAuthModal);
+  }
+}
+
+function showAuthModal() {
+  document.getElementById('authModal').classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').classList.add('hidden');
+}
+
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  if (tab === 'login') {
+    document.querySelectorAll('.auth-tab')[0].classList.add('active');
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+  } else {
+    document.querySelectorAll('.auth-tab')[1].classList.add('active');
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'block';
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    userToken = data.token;
+    userName = data.user.display_name;
+    localStorage.setItem('safetymap_token', userToken);
+    localStorage.setItem('safetymap_name', userName);
+    updateAuthUI();
+    closeAuthModal();
+    showToast('ログインしました', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const email = document.getElementById('regEmail').value;
+  const emailConfirm = document.getElementById('regEmailConfirm').value;
+  const display_name = document.getElementById('regName').value;
+  const real_name = document.getElementById('regRealName').value;
+  const address = document.getElementById('regAddress').value;
+  const phone = document.getElementById('regPhone').value;
+
+  if (email !== emailConfirm) {
+    showToast('メールアドレスが一致しません', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, display_name, real_name, address, phone })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    userToken = data.token;
+    userName = data.user.display_name;
+    localStorage.setItem('safetymap_token', userToken);
+    localStorage.setItem('safetymap_name', userName);
+    updateAuthUI();
+    closeAuthModal();
+    showToast(data.message, 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function handleLogout() {
+  userToken = null;
+  userName = null;
+  localStorage.removeItem('safetymap_token');
+  localStorage.removeItem('safetymap_name');
+  updateAuthUI();
+  showToast('ログアウトしました');
+}
+
+// === 投稿 ===
+function openReportModal() {
+  document.getElementById('reportModal').classList.remove('hidden');
+  // フォームリセット
+  document.getElementById('reportForm').reset();
+  document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
+  resetPhotoSlots();
+
+  // カテゴリー選択イベント
+  document.querySelectorAll('.category-option').forEach(opt => {
+    opt.onclick = () => {
+      document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      opt.querySelector('input').checked = true;
+    };
+  });
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').classList.add('hidden');
+  if (tempMarker) {
+    map.removeLayer(tempMarker);
+    tempMarker = null;
+  }
+}
+
+function previewPhoto(input, slot) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('写真のサイズは5MB以下にしてください', 'error');
+    input.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const slotEl = document.getElementById('photoSlot' + slot);
+    slotEl.innerHTML = `
+      <img src="${e.target.result}">
+      <button type="button" class="remove-photo" onclick="removePhoto(event, ${slot})">&times;</button>
+    `;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(e, slot) {
+  e.stopPropagation();
+  document.getElementById('photoInput' + slot).value = '';
+  const slotEl = document.getElementById('photoSlot' + slot);
+  slotEl.innerHTML = `
+    <div class="placeholder">写真${slot}</div>
+    <button type="button" class="remove-photo" onclick="removePhoto(event, ${slot})">&times;</button>
+  `;
+}
+
+function resetPhotoSlots() {
+  [1, 2].forEach(slot => {
+    document.getElementById('photoInput' + slot).value = '';
+    const slotEl = document.getElementById('photoSlot' + slot);
+    slotEl.innerHTML = `
+      <div class="placeholder">写真${slot}</div>
+      <button type="button" class="remove-photo" onclick="removePhoto(event, ${slot})">&times;</button>
+    `;
+  });
+}
+
+async function handleSubmitReport(e) {
+  e.preventDefault();
+
+  const category = document.querySelector('input[name="category"]:checked');
+  if (!category) {
+    showToast('カテゴリーを選択してください', 'error');
+    return;
+  }
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner"></span> 投稿中...';
+
+  const formData = new FormData();
+  formData.append('latitude', document.getElementById('reportLat').value);
+  formData.append('longitude', document.getElementById('reportLng').value);
+  formData.append('category', category.value);
+  formData.append('title', document.getElementById('reportTitle').value);
+  formData.append('description', document.getElementById('reportDescription').value);
+
+  const photo1 = document.getElementById('photoInput1').files[0];
+  const photo2 = document.getElementById('photoInput2').files[0];
+  if (photo1) formData.append('photos', photo1);
+  if (photo2) formData.append('photos', photo2);
+
+  try {
+    const res = await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'x-user-token': userToken },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    showToast('投稿が完了しました', 'success');
+    closeReportModal();
+    loadReports();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '投稿する';
+  }
+}
+
+// === ユーティリティ ===
+function showToast(message, type = '') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
+}
