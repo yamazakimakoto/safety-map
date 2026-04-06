@@ -2,6 +2,13 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
+// PostgreSQL用: ? を $1, $2, ... に変換
+function convertPlaceholders(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+// --- SQLite ラッパー ---
 class SqliteDatabase {
   constructor(db) { this.db = db; }
   async get(sql, params = []) { return this.db.prepare(sql).get(...params); }
@@ -9,6 +16,26 @@ class SqliteDatabase {
   async run(sql, params = []) { return this.db.prepare(sql).run(...params); }
   async exec(sql) { return this.db.exec(sql); }
   async close() { this.db.close(); }
+}
+
+// --- PostgreSQL ラッパー ---
+class PgDatabase {
+  constructor(pool) { this.pool = pool; }
+  async get(sql, params = []) {
+    const result = await this.pool.query(convertPlaceholders(sql), params);
+    return result.rows[0] || undefined;
+  }
+  async all(sql, params = []) {
+    const result = await this.pool.query(convertPlaceholders(sql), params);
+    return result.rows;
+  }
+  async run(sql, params = []) {
+    await this.pool.query(convertPlaceholders(sql), params);
+  }
+  async exec(sql) {
+    await this.pool.query(sql);
+  }
+  async close() { await this.pool.end(); }
 }
 
 const CREATE_TABLES = `
@@ -61,30 +88,61 @@ const CREATE_INDEXES = `
 `;
 
 async function initDatabase() {
-  const Database = require('better-sqlite3');
-  const fs = require('fs');
-  const dataDir = path.join(__dirname, 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  const isPostgres = !!process.env.DATABASE_URL;
+  let db;
+
+  if (isPostgres) {
+    // PostgreSQL
+    const dns = require('dns');
+    dns.setDefaultResultOrder('ipv4first');
+
+    const { Pool } = require('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    db = new PgDatabase(pool);
+
+    await db.exec(CREATE_TABLES);
+    await db.exec(CREATE_INDEXES);
+
+    // マイグレーション
+    try { await db.exec("ALTER TABLE reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
+    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
+
+    console.log('PostgreSQL に接続しました');
+
+  } else {
+    // SQLite
+    const Database = require('better-sqlite3');
+    const fs = require('fs');
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    const sqliteDb = new Database(path.join(__dirname, 'data', 'safety-map.db'));
+    sqliteDb.pragma('journal_mode = WAL');
+    sqliteDb.pragma('foreign_keys = ON');
+    db = new SqliteDatabase(sqliteDb);
+
+    await db.exec(CREATE_TABLES);
+    await db.exec(CREATE_INDEXES);
+
+    // マイグレーション
+    try { await db.exec("ALTER TABLE reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
+    try { await db.exec("ALTER TABLE reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
+
+    console.log('SQLite を使用しています');
   }
-
-  const sqliteDb = new Database(path.join(__dirname, 'data', 'safety-map.db'));
-  sqliteDb.pragma('journal_mode = WAL');
-  sqliteDb.pragma('foreign_keys = ON');
-  const db = new SqliteDatabase(sqliteDb);
-
-  await db.exec(CREATE_TABLES);
-  await db.exec(CREATE_INDEXES);
-
-  // マイグレーション: reports テーブル拡張
-  try { await db.exec("ALTER TABLE reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
-  try { await db.exec("ALTER TABLE reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
-  try { await db.exec("ALTER TABLE reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
-
-  // マイグレーション: real_name, address, phone カラム追加
-  try { await db.exec("ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
-  try { await db.exec("ALTER TABLE users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
-  try { await db.exec("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''"); } catch (e) {}
 
   // デフォルト管理者の作成
   const adminExists = await db.get('SELECT COUNT(*) as count FROM admins');
