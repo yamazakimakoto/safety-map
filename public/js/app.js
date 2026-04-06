@@ -228,14 +228,17 @@ function updateAuthUI() {
   oldBtn.parentNode.replaceChild(btn, oldBtn);
   btn.id = 'authBtn';
 
+  const myBtn = document.getElementById('myPostsBtn');
   if (userToken && userName) {
     info.textContent = userName;
     btn.textContent = 'ログアウト';
     btn.addEventListener('click', handleLogout);
+    myBtn.style.display = 'inline-block';
   } else {
     info.textContent = '';
     btn.textContent = 'ログイン';
     btn.addEventListener('click', showAuthModal);
+    myBtn.style.display = 'none';
   }
 }
 
@@ -439,6 +442,101 @@ async function handleSubmitReport(e) {
     submitBtn.disabled = false;
     submitBtn.textContent = '投稿する';
   }
+}
+
+// === マイ投稿 ===
+async function showMyPosts() {
+  if (!userToken) { showToast('ログインが必要です', 'error'); return; }
+  document.getElementById('myPostsModal').classList.remove('hidden');
+  document.getElementById('myPostsList').innerHTML = '<p style="text-align:center;color:#999">読み込み中...</p>';
+
+  try {
+    const res = await fetch('/api/reports/my', { headers: { 'x-user-token': userToken } });
+    if (!res.ok) throw new Error('取得エラー');
+    const posts = await res.json();
+
+    if (posts.length === 0) {
+      document.getElementById('myPostsList').innerHTML = '<p style="text-align:center;color:#999;padding:20px">投稿はまだありません</p>';
+      return;
+    }
+
+    document.getElementById('myPostsList').innerHTML = posts.map(r => {
+      const color = CATEGORY_COLORS[r.category] || '#9E9E9E';
+      return `
+        <div class="report-card" style="cursor:default">
+          <div class="report-card-header">
+            <span class="report-category-badge" style="background:${color}">${escapeHtml(r.category)}</span>
+            <span class="status-badge status-${r.status}" style="margin-left:6px">${STATUS_LABELS[r.status] || r.status}</span>
+          </div>
+          <div class="report-card-title">${escapeHtml(r.title)}</div>
+          <p style="font-size:13px;color:#666;margin:4px 0">${escapeHtml((r.description || '').substring(0, 100))}</p>
+          <div class="report-card-meta">投稿日: ${formatDate(r.created_at)} / 座標: ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="openUserEditReport('${r.id}','${escapeAttr(r.category)}','${escapeAttr(r.title)}','${escapeAttr(r.description||'')}')">編集</button>
+            <button class="btn btn-danger" style="padding:6px 14px;font-size:13px" onclick="deleteMyReport('${r.id}')">削除</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('myPostsList').innerHTML = '<p style="text-align:center;color:#F44336">読み込みに失敗しました</p>';
+  }
+}
+
+function closeMyPostsModal() {
+  document.getElementById('myPostsModal').classList.add('hidden');
+}
+
+function openUserEditReport(id, category, title, description) {
+  document.getElementById('userEditId').value = id;
+  document.getElementById('userEditCategory').value = category;
+  document.getElementById('userEditTitle').value = title;
+  document.getElementById('userEditDescription').value = description;
+  document.getElementById('userEditModal').classList.remove('hidden');
+}
+
+function closeUserEditModal() {
+  document.getElementById('userEditModal').classList.add('hidden');
+}
+
+async function handleUserEditReport(e) {
+  e.preventDefault();
+  const id = document.getElementById('userEditId').value;
+  try {
+    const res = await fetch(`/api/reports/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': userToken },
+      body: JSON.stringify({
+        category: document.getElementById('userEditCategory').value,
+        title: document.getElementById('userEditTitle').value,
+        description: document.getElementById('userEditDescription').value
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('投稿を更新しました', 'success');
+    closeUserEditModal();
+    showMyPosts();
+    loadReports();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteMyReport(id) {
+  if (!confirm('この投稿を削除しますか？場所を変更する場合は削除後に再投稿してください。')) return;
+  try {
+    const res = await fetch(`/api/reports/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-user-token': userToken }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('投稿を削除しました', 'success');
+    showMyPosts();
+    loadReports();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function escapeAttr(s) {
+  return (s || '').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
 // === ユーティリティ ===

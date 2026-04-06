@@ -192,6 +192,83 @@ function createReportRoutes(db) {
     }
   });
 
+  // 自分の投稿一覧
+  router.get('/my', async (req, res) => {
+    try {
+      const token = req.headers['x-user-token'];
+      if (!token) return res.status(401).json({ error: 'ログインが必要です' });
+      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      if (!user) return res.status(401).json({ error: '無効なセッションです' });
+
+      const reports = await db.all(
+        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id
+         WHERE r.user_id = ? ORDER BY r.created_at DESC`,
+        [user.id]
+      );
+      res.json(reports);
+    } catch (error) {
+      console.error('マイ投稿取得エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 自分の投稿を編集（場所以外）
+  router.put('/:id', async (req, res) => {
+    try {
+      const token = req.headers['x-user-token'];
+      if (!token) return res.status(401).json({ error: 'ログインが必要です' });
+      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      if (!user) return res.status(401).json({ error: '無効なセッションです' });
+
+      const report = await db.get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
+      if (!report) return res.status(404).json({ error: '投稿が見つからないか、編集権限がありません' });
+
+      const { category, title, description } = req.body;
+      const updates = [];
+      const params = [];
+
+      if (category && VALID_CATEGORIES.includes(category)) { updates.push('category = ?'); params.push(category); }
+      if (title) { updates.push('title = ?'); params.push(sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} })); }
+      if (description !== undefined) { updates.push('description = ?'); params.push(sanitizeHtml(description, { allowedTags: [], allowedAttributes: {} })); }
+
+      if (updates.length === 0) return res.status(400).json({ error: '更新する項目がありません' });
+
+      updates.push('updated_at = ?');
+      params.push(new Date().toISOString());
+      params.push(req.params.id);
+
+      await db.run(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`, params);
+
+      const updated = await db.get(
+        `SELECT r.*, u.display_name as author_name FROM reports r JOIN users u ON r.user_id = u.id WHERE r.id = ?`,
+        [req.params.id]
+      );
+      res.json({ message: '投稿を更新しました', report: updated });
+    } catch (error) {
+      console.error('投稿更新エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
+  // 自分の投稿を削除
+  router.delete('/:id', async (req, res) => {
+    try {
+      const token = req.headers['x-user-token'];
+      if (!token) return res.status(401).json({ error: 'ログインが必要です' });
+      const user = await db.get('SELECT id FROM users WHERE session_token = ?', [token]);
+      if (!user) return res.status(401).json({ error: '無効なセッションです' });
+
+      const report = await db.get('SELECT * FROM reports WHERE id = ? AND user_id = ?', [req.params.id, user.id]);
+      if (!report) return res.status(404).json({ error: '投稿が見つからないか、削除権限がありません' });
+
+      await db.run('DELETE FROM reports WHERE id = ?', [req.params.id]);
+      res.json({ message: '投稿を削除しました' });
+    } catch (error) {
+      console.error('投稿削除エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
+    }
+  });
+
   return router;
 }
 

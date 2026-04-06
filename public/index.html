@@ -15,6 +15,7 @@
     <h1>街の安全安心マップ</h1>
     <div class="header-actions">
       <span class="user-info" id="userInfo"></span>
+      <button id="myPostsBtn" style="display:none" onclick="showMyPosts()">マイ投稿</button>
       <button id="authBtn">ログイン</button>
     </div>
   </header>
@@ -169,6 +170,57 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeReportModal()">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- マイ投稿モーダル -->
+  <div class="modal-overlay hidden" id="myPostsModal">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <h2>マイ投稿</h2>
+        <p>自分の投稿を管理できます。場所を変更する場合は削除して再投稿してください。</p>
+      </div>
+      <div class="modal-body" id="myPostsList" style="max-height:60vh;overflow-y:auto"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeMyPostsModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投稿編集モーダル（ユーザー用） -->
+  <div class="modal-overlay hidden" id="userEditModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>投稿を編集</h2>
+        <p>カテゴリー・タイトル・詳細を変更できます。場所の変更は削除→再投稿が必要です。</p>
+      </div>
+      <div class="modal-body">
+        <form id="userEditForm" onsubmit="handleUserEditReport(event)">
+          <input type="hidden" id="userEditId">
+          <div class="form-group">
+            <label>カテゴリー</label>
+            <select id="userEditCategory">
+              <option value="環境">環境</option>
+              <option value="交通・道路">交通・道路</option>
+              <option value="防犯">防犯</option>
+              <option value="防災">防災</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>タイトル</label>
+            <input type="text" id="userEditTitle" required maxlength="100">
+          </div>
+          <div class="form-group">
+            <label>詳細メモ</label>
+            <textarea id="userEditDescription" rows="4"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">更新する</button>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeUserEditModal()">キャンセル</button>
       </div>
     </div>
   </div>
