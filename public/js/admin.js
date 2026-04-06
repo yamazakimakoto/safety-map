@@ -302,8 +302,6 @@ async function printReport(id) {
 
     const color = CATEGORY_COLORS[r.category] || '#999';
     const adminColor = ADMIN_STATUS_COLORS[r.admin_status] || '#9E9E9E';
-    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${r.longitude-0.005},${r.latitude-0.003},${r.longitude+0.005},${r.latitude+0.003}&layer=mapnik&marker=${r.latitude},${r.longitude}`;
-    const staticMapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${r.latitude},${r.longitude}&zoom=16&size=400x300&markers=${r.latitude},${r.longitude},lightblue`;
 
     let photosHtml = '';
     if (r.photo1_url) photosHtml += `<img src="${r.photo1_url}" style="max-width:48%;max-height:200px;object-fit:cover;border-radius:6px;border:1px solid #ddd">`;
@@ -325,33 +323,41 @@ async function printReport(id) {
 <head>
 <meta charset="UTF-8">
 <title>投稿カード - ${esc(r.title)}</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  @page { size: A4; margin: 15mm; }
+  @page { size: A4; margin: 12mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, 'Hiragino Sans', sans-serif; color: #333; font-size: 11pt; line-height: 1.5; }
-  .card { border: 2px solid #1a73e8; border-radius: 12px; padding: 20px; max-width: 100%; }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e0e0e0; }
-  .card-header h1 { font-size: 14pt; color: #1a73e8; }
+  body { font-family: -apple-system, 'Hiragino Sans', sans-serif; color: #333; font-size: 10pt; line-height: 1.5; }
+  .card { border: 2px solid #1a73e8; border-radius: 10px; padding: 16px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0; }
+  .card-header h1 { font-size: 13pt; color: #1a73e8; }
   .badges { display: flex; gap: 6px; }
-  .badge { padding: 2px 10px; border-radius: 12px; font-size: 9pt; font-weight: 600; color: white; }
-  .title { font-size: 16pt; font-weight: 700; margin-bottom: 6px; }
-  .address { font-size: 10pt; color: #666; margin-bottom: 10px; }
-  .description { font-size: 10pt; color: #555; line-height: 1.6; margin-bottom: 14px; padding: 10px; background: #f8f9fa; border-radius: 6px; }
-  .content-grid { display: flex; gap: 16px; margin-bottom: 14px; }
-  .map-area { flex: 1; }
-  .map-area iframe, .map-area img { width: 100%; height: 220px; border: 1px solid #ddd; border-radius: 6px; }
-  .photos { flex: 1; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; font-size: 9pt; color: #666; padding-top: 10px; border-top: 1px solid #e0e0e0; }
-  .meta-item { display: flex; gap: 6px; }
-  .meta-label { font-weight: 600; color: #444; min-width: 60px; }
-  .memo-section { margin-top: 12px; padding: 10px; background: #fffde7; border-radius: 6px; border: 1px solid #fff9c4; }
-  .memo-section h3 { font-size: 10pt; color: #f57f17; margin-bottom: 4px; }
-  .memo-section p { font-size: 9pt; color: #555; }
-  .footer { margin-top: 12px; text-align: center; font-size: 8pt; color: #999; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  .badge { padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600; color: white; }
+  .title { font-size: 15pt; font-weight: 700; margin-bottom: 4px; }
+  .address { font-size: 9pt; color: #666; margin-bottom: 8px; }
+  .description { font-size: 9pt; color: #555; line-height: 1.6; margin-bottom: 12px; padding: 8px; background: #f8f9fa; border-radius: 6px; min-height: 30px; }
+  .content-grid { display: flex; gap: 12px; margin-bottom: 12px; }
+  .map-area { flex: 1; min-width: 0; }
+  #printMap { width: 100%; height: 220px; border: 1px solid #ddd; border-radius: 6px; }
+  .photos { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; justify-content: center; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; font-size: 8pt; color: #666; padding-top: 8px; border-top: 1px solid #e0e0e0; }
+  .meta-item { display: flex; gap: 4px; }
+  .meta-label { font-weight: 600; color: #444; min-width: 55px; }
+  .memo-section { margin-top: 8px; padding: 8px; background: #fffde7; border-radius: 6px; border: 1px solid #fff9c4; }
+  .memo-section h3 { font-size: 9pt; color: #f57f17; margin-bottom: 3px; }
+  .memo-section p { font-size: 8pt; color: #555; white-space: pre-wrap; }
+  .footer { margin-top: 8px; text-align: center; font-size: 7pt; color: #999; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none; }
+  }
 </style>
 </head>
 <body>
+<div class="no-print" style="padding:8px;text-align:right;background:#f0f0f0">
+  <button onclick="window.print()" style="padding:6px 16px;background:#1a73e8;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">印刷</button>
+  <button onclick="parent.document.getElementById('printFrame').remove()" style="padding:6px 16px;background:#999;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-left:4px">閉じる</button>
+</div>
 <div class="card">
   <div class="card-header">
     <h1>街の安全安心マップ - 投稿カード</h1>
@@ -368,7 +374,7 @@ async function printReport(id) {
 
   <div class="content-grid">
     <div class="map-area">
-      <img src="${staticMapUrl}" alt="地図" onerror="this.parentElement.innerHTML='<iframe src=\\'${mapUrl}\\' frameborder=\\'0\\'></iframe>'">
+      <div id="printMap"></div>
     </div>
     ${photosHtml ? `<div class="photos">${photosHtml}</div>` : ''}
   </div>
@@ -386,15 +392,18 @@ async function printReport(id) {
 
   <div class="footer">投稿ID: ${r.id} | 印刷日: ${new Date().toLocaleDateString('ja-JP')}</div>
 </div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-window.onload = function() {
-  window.print();
-  // 印刷ダイアログ後にiframeを閉じる
-  setTimeout(function() {
-    var frame = window.parent.document.getElementById('printFrame');
-    if (frame) frame.remove();
-  }, 1000);
-};
+var map = L.map('printMap', { zoomControl: false, attributionControl: false }).setView([${r.latitude}, ${r.longitude}], 16);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+var icon = L.divIcon({
+  className: 'custom-marker',
+  html: '<svg width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.27 21.73 0 14 0z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="6" fill="white"/></svg>',
+  iconSize: [28, 40], iconAnchor: [14, 40]
+});
+L.marker([${r.latitude}, ${r.longitude}], { icon: icon }).addTo(map);
+// タイル読み込み完了後に印刷可能に
+setTimeout(function() { map.invalidateSize(); }, 500);
 </script>
 </body>
 </html>`);
