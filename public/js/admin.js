@@ -308,106 +308,68 @@ async function printReport(id) {
     if (r.photo2_url) photosHtml += `<img src="${r.photo2_url}" style="max-width:48%;max-height:200px;object-fit:cover;border-radius:6px;border:1px solid #ddd">`;
 
     const memoSummary = (r.admin_memo || '').substring(0, 300);
+    const mapEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${r.longitude-0.004}%2C${r.latitude-0.003}%2C${r.longitude+0.004}%2C${r.latitude+0.003}&layer=mapnik&marker=${r.latitude}%2C${r.longitude}`;
 
-    // iframe方式で印刷（ポップアップブロッカー対策）
-    let printFrame = document.getElementById('printFrame');
-    if (printFrame) printFrame.remove();
-    printFrame = document.createElement('iframe');
-    printFrame.id = 'printFrame';
-    printFrame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;border:none;background:white;';
-    document.body.appendChild(printFrame);
-    const printDoc = printFrame.contentDocument || printFrame.contentWindow.document;
-    printDoc.open();
-    printDoc.write(`<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
+    // 新しいページで印刷カードを表示
+    const html = `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
 <title>投稿カード - ${esc(r.title)}</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  @page { size: A4; margin: 12mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, 'Hiragino Sans', sans-serif; color: #333; font-size: 10pt; line-height: 1.5; }
-  .card { border: 2px solid #1a73e8; border-radius: 10px; padding: 16px; }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0; }
-  .card-header h1 { font-size: 13pt; color: #1a73e8; }
-  .badges { display: flex; gap: 6px; }
-  .badge { padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600; color: white; }
-  .title { font-size: 15pt; font-weight: 700; margin-bottom: 4px; }
-  .address { font-size: 9pt; color: #666; margin-bottom: 8px; }
-  .description { font-size: 9pt; color: #555; line-height: 1.6; margin-bottom: 12px; padding: 8px; background: #f8f9fa; border-radius: 6px; min-height: 30px; }
-  .content-grid { display: flex; gap: 12px; margin-bottom: 12px; }
-  .map-area { flex: 1; min-width: 0; }
-  #printMap { width: 100%; height: 220px; border: 1px solid #ddd; border-radius: 6px; }
-  .photos { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; justify-content: center; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; font-size: 8pt; color: #666; padding-top: 8px; border-top: 1px solid #e0e0e0; }
-  .meta-item { display: flex; gap: 4px; }
-  .meta-label { font-weight: 600; color: #444; min-width: 55px; }
-  .memo-section { margin-top: 8px; padding: 8px; background: #fffde7; border-radius: 6px; border: 1px solid #fff9c4; }
-  .memo-section h3 { font-size: 9pt; color: #f57f17; margin-bottom: 3px; }
-  .memo-section p { font-size: 8pt; color: #555; white-space: pre-wrap; }
-  .footer { margin-top: 8px; text-align: center; font-size: 7pt; color: #999; }
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none; }
-  }
-</style>
-</head>
-<body>
-<div class="no-print" style="padding:8px;text-align:right;background:#f0f0f0">
-  <button onclick="window.print()" style="padding:6px 16px;background:#1a73e8;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">印刷</button>
-  <button onclick="parent.document.getElementById('printFrame').remove()" style="padding:6px 16px;background:#999;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-left:4px">閉じる</button>
+@page{size:A4;margin:12mm}*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Hiragino Sans',sans-serif;color:#333;font-size:10pt;line-height:1.5}
+.card{border:2px solid #1a73e8;border-radius:10px;padding:16px}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e0e0e0}
+.card-header h1{font-size:13pt;color:#1a73e8}
+.badges{display:flex;gap:6px}
+.badge{padding:2px 10px;border-radius:12px;font-size:8pt;font-weight:600;color:white}
+.title{font-size:15pt;font-weight:700;margin-bottom:4px}
+.address{font-size:9pt;color:#666;margin-bottom:8px}
+.desc{font-size:9pt;color:#555;line-height:1.6;margin-bottom:12px;padding:8px;background:#f8f9fa;border-radius:6px}
+.grid{display:flex;gap:12px;margin-bottom:12px}
+.grid .map{flex:1}
+.grid .map iframe{width:100%;height:220px;border:1px solid #ddd;border-radius:6px}
+.grid .photos{flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;justify-content:center}
+.grid .photos img{max-width:48%;max-height:200px;object-fit:cover;border-radius:6px;border:1px solid #ddd}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;font-size:8pt;color:#666;padding-top:8px;border-top:1px solid #e0e0e0}
+.meta div{display:flex;gap:4px}
+.meta b{font-weight:600;color:#444;min-width:55px}
+.memo{margin-top:8px;padding:8px;background:#fffde7;border-radius:6px;border:1px solid #fff9c4}
+.memo h3{font-size:9pt;color:#f57f17;margin-bottom:3px}
+.memo p{font-size:8pt;color:#555;white-space:pre-wrap}
+.foot{margin-top:8px;text-align:center;font-size:7pt;color:#999}
+.toolbar{padding:8px;text-align:right;background:#f0f0f0}
+.toolbar button{padding:6px 16px;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px}
+@media print{.toolbar{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="toolbar">
+<button style="background:#1a73e8" onclick="window.print()">印刷</button>
+<button style="background:#999" onclick="window.close()">閉じる</button>
 </div>
 <div class="card">
-  <div class="card-header">
-    <h1>街の安全安心マップ - 投稿カード</h1>
-    <div class="badges">
-      <span class="badge" style="background:${color}">${esc(r.category)}</span>
-      <span class="badge" style="background:${adminColor}">${esc(r.admin_status || '投稿')}</span>
-    </div>
-  </div>
-
-  <div class="title">${esc(r.title)}</div>
-  ${r.address ? `<div class="address">📍 ${esc(r.address)}</div>` : ''}
-
-  ${r.description ? `<div class="description">${esc(r.description)}</div>` : ''}
-
-  <div class="content-grid">
-    <div class="map-area">
-      <div id="printMap"></div>
-    </div>
-    ${photosHtml ? `<div class="photos">${photosHtml}</div>` : ''}
-  </div>
-
-  ${memoSummary ? `<div class="memo-section"><h3>管理メモ</h3><p>${esc(memoSummary)}${r.admin_memo && r.admin_memo.length > 300 ? '...' : ''}</p></div>` : ''}
-
-  <div class="meta-grid">
-    <div class="meta-item"><span class="meta-label">投稿者:</span> ${esc(r.author_name)}</div>
-    <div class="meta-item"><span class="meta-label">投稿日:</span> ${fmtDate(r.created_at)}</div>
-    <div class="meta-item"><span class="meta-label">座標:</span> ${r.latitude.toFixed(6)}, ${r.longitude.toFixed(6)}</div>
-    <div class="meta-item"><span class="meta-label">Gマップ:</span> <a href="https://www.google.com/maps?q=${r.latitude},${r.longitude}" style="color:#1a73e8;font-size:8pt">開く</a></div>
-    ${r.author_real_name ? `<div class="meta-item"><span class="meta-label">本名:</span> ${esc(r.author_real_name)}</div>` : ''}
-    ${r.author_phone ? `<div class="meta-item"><span class="meta-label">電話:</span> ${esc(r.author_phone)}</div>` : ''}
-  </div>
-
-  <div class="footer">投稿ID: ${r.id} | 印刷日: ${new Date().toLocaleDateString('ja-JP')}</div>
+<div class="card-header"><h1>街の安全安心マップ - 投稿カード</h1>
+<div class="badges"><span class="badge" style="background:${color}">${esc(r.category)}</span>
+<span class="badge" style="background:${adminColor}">${esc(r.admin_status||'投稿')}</span></div></div>
+<div class="title">${esc(r.title)}</div>
+${r.address?`<div class="address">📍 ${esc(r.address)}</div>`:''}
+${r.description?`<div class="desc">${esc(r.description)}</div>`:''}
+<div class="grid"><div class="map"><iframe src="${mapEmbedUrl}" frameborder="0" scrolling="no"></iframe></div>
+${photosHtml?`<div class="photos">${photosHtml}</div>`:''}</div>
+${memoSummary?`<div class="memo"><h3>管理メモ</h3><p>${esc(memoSummary)}${r.admin_memo&&r.admin_memo.length>300?'...':''}</p></div>`:''}
+<div class="meta">
+<div><b>投稿者:</b>${esc(r.author_name)}</div>
+<div><b>投稿日:</b>${fmtDate(r.created_at)}</div>
+<div><b>座標:</b>${r.latitude.toFixed(6)}, ${r.longitude.toFixed(6)}</div>
+<div><b>Gマップ:</b><a href="https://www.google.com/maps?q=${r.latitude},${r.longitude}" style="color:#1a73e8;font-size:8pt">開く</a></div>
+${r.author_real_name?`<div><b>本名:</b>${esc(r.author_real_name)}</div>`:''}
+${r.author_phone?`<div><b>電話:</b>${esc(r.author_phone)}</div>`:''}
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-var map = L.map('printMap', { zoomControl: false, attributionControl: false }).setView([${r.latitude}, ${r.longitude}], 16);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-var icon = L.divIcon({
-  className: 'custom-marker',
-  html: '<svg width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.27 21.73 0 14 0z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="6" fill="white"/></svg>',
-  iconSize: [28, 40], iconAnchor: [14, 40]
-});
-L.marker([${r.latitude}, ${r.longitude}], { icon: icon }).addTo(map);
-// タイル読み込み完了後に印刷可能に
-setTimeout(function() { map.invalidateSize(); }, 500);
-</script>
-</body>
-</html>`);
-    printDoc.close();
+<div class="foot">投稿ID: ${r.id} | 印刷日: ${new Date().toLocaleDateString('ja-JP')}</div>
+</div></body></html>`;
+
+    // Blob URLで新しいタブに開く（Safari対応）
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   } catch (err) { showToast(err.message, 'error'); }
 }
 
