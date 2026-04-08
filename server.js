@@ -33,6 +33,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // データベース初期化 & ルート設定
 (async () => {
+  try {
   const db = await initDatabase();
 
   app.use('/api/auth', createAuthRoutes(db));
@@ -54,4 +55,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
   app.listen(PORT, () => {
     console.log(`街の安全安心マップ サーバー起動: http://localhost:${PORT}`);
   });
+  } catch (err) {
+    console.error('サーバー起動エラー:', err);
+    process.exit(1);
+  }
 })();

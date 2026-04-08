@@ -105,7 +105,12 @@ async function initDatabase() {
     db = new PgDatabase(pool);
 
     await db.exec(CREATE_TABLES);
-    await db.exec(CREATE_INDEXES);
+
+    // インデックスを個別に作成（PostgreSQL互換）
+    try { await db.exec("CREATE INDEX IF NOT EXISTS idx_sm_reports_category ON sm_reports(category)"); } catch (e) {}
+    try { await db.exec("CREATE INDEX IF NOT EXISTS idx_sm_reports_status ON sm_reports(status)"); } catch (e) {}
+    try { await db.exec("CREATE INDEX IF NOT EXISTS idx_sm_reports_created_at ON sm_reports(created_at DESC)"); } catch (e) {}
+    try { await db.exec("CREATE INDEX IF NOT EXISTS idx_sm_reports_user_id ON sm_reports(user_id)"); } catch (e) {}
 
     // マイグレーション
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
