@@ -8,7 +8,15 @@ const CATEGORY_COLORS = {
 const STATUS_MAP = { published: '公開', hidden: '非公開', resolved: '対応済' };
 const ADMIN_STATUS_COLORS = { '投稿': '#9E9E9E', '受付': '#2196F3', '対応中': '#FF9800', '解決': '#4CAF50' };
 
-document.addEventListener('DOMContentLoaded', () => { if (adminToken) showDashboard(); });
+document.addEventListener('DOMContentLoaded', async () => {
+  if (adminToken) {
+    try {
+      const res = await fetch('/api/admin/stats', { headers: { 'x-admin-token': adminToken } });
+      if (!res.ok) { adminLogout(); return; }
+      showDashboard();
+    } catch (e) { adminLogout(); }
+  }
+});
 
 // === 認証 ===
 async function handleAdminLogin(e) {

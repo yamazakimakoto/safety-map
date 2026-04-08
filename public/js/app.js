@@ -47,6 +47,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) { console.warn('エリア設定取得失敗、デフォルト使用'); }
 
+  // セッション有効性チェック
+  if (userToken) {
+    try {
+      const res = await fetch('/api/auth/profile', { headers: { 'x-user-token': userToken } });
+      if (!res.ok) {
+        userToken = null;
+        userName = null;
+        localStorage.removeItem('safetymap_token');
+        localStorage.removeItem('safetymap_name');
+      }
+    } catch (e) {}
+  }
+
   initMap();
   initFilters();
   loadReports();
