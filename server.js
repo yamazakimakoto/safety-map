@@ -52,8 +52,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   });
 
-  app.listen(PORT, () => {
-    console.log(`街の安全安心マップ サーバー起動: http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`街の安全安心マップ サーバー起動: http://0.0.0.0:${PORT}`);
   });
   } catch (err) {
     console.error('サーバー起動エラー:', err);
