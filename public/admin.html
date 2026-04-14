@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>管理者画面 - 街の安全安心マップ</title>
+  <title>管理者画面 - 街の安全安心マップ plus</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     .tabs { display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 20px; overflow-x: auto; }
@@ -85,7 +85,7 @@
           <option value="交通・道路">交通・道路</option>
           <option value="防犯">防犯</option>
           <option value="防災">防災</option>
-          <option value="その他">その他</option>
+          <option value="その他">その他</option><option value="写真スポット">写真スポット</option>
         </select>
         <select id="filterStatus" onchange="loadAdminReports()" style="padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;font-size:14px">
           <option value="">全ステータス</option>
@@ -145,7 +145,7 @@
               <option value="交通・道路">交通・道路</option>
               <option value="防犯">防犯</option>
               <option value="防災">防災</option>
-              <option value="その他">その他</option>
+              <option value="その他">その他</option><option value="写真スポット">写真スポット</option>
             </select>
           </div>
           <div class="form-group">
@@ -281,7 +281,7 @@
           <input type="hidden" id="editId">
           <div class="form-group">
             <label>カテゴリー</label>
-            <select id="editCategory"><option value="環境">環境</option><option value="交通・道路">交通・道路</option><option value="防犯">防犯</option><option value="防災">防災</option><option value="その他">その他</option></select>
+            <select id="editCategory"><option value="環境">環境</option><option value="交通・道路">交通・道路</option><option value="防犯">防犯</option><option value="防災">防災</option><option value="その他">その他</option><option value="写真スポット">写真スポット</option></select>
           </div>
           <div class="form-group"><label>タイトル</label><input type="text" id="editTitle" required></div>
           <div class="form-group"><label>詳細</label><textarea id="editDescription" rows="4"></textarea></div>

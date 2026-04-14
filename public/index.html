@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>街の安全安心マップ</title>
+  <title>街の安全安心マップ plus</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
@@ -12,7 +12,7 @@
 <body>
   <!-- ヘッダー -->
   <header class="header">
-    <h1>街の安全安心マップ</h1>
+    <h1>街の安全安心マップ plus</h1>
     <div class="header-actions">
       <span class="user-info" id="userInfo"></span>
       <button id="myPostsBtn" style="display:none" onclick="showMyPosts()">マイ投稿</button>
@@ -29,6 +29,7 @@
     <button class="filter-btn" data-category="防犯" style="--dot-color:#E91E63">防犯</button>
     <button class="filter-btn" data-category="防災" style="--dot-color:#FF9800">防災</button>
     <button class="filter-btn" data-category="その他" style="--dot-color:#9E9E9E">その他</button>
+    <button class="filter-btn" data-category="写真スポット" style="--dot-color:#FF69B4">写真スポット</button>
   </div>
 
   <!-- メインコンテンツ -->
@@ -49,7 +50,7 @@
   <div class="modal-overlay hidden" id="authModal">
     <div class="modal">
       <div class="modal-header">
-        <h2>街の安全安心マップ</h2>
+        <h2>街の安全安心マップ plus</h2>
         <p>地域の安心安全情報を共有しましょう</p>
       </div>
       <div class="modal-body">
@@ -151,6 +152,11 @@
                 <span class="category-dot" style="background:#9E9E9E"></span>
                 その他
               </label>
+              <label class="category-option" data-category="写真スポット">
+                <input type="radio" name="category" value="写真スポット">
+                <span class="category-dot" style="background:#FF69B4"></span>
+                写真スポット
+              </label>
             </div>
           </div>
           <div class="form-group">
@@ -244,6 +250,7 @@
               <option value="防犯">防犯</option>
               <option value="防災">防災</option>
               <option value="その他">その他</option>
+              <option value="写真スポット">写真スポット</option>
             </select>
           </div>
           <div class="form-group">

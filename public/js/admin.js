@@ -3,7 +3,7 @@ let adminName = localStorage.getItem('safetymap_admin_name');
 let allAdminReports = [];
 
 const CATEGORY_COLORS = {
-  '環境': '#4CAF50', '交通・道路': '#2196F3', '防犯': '#E91E63', '防災': '#FF9800', 'その他': '#9E9E9E'
+  '環境': '#4CAF50', '交通・道路': '#2196F3', '防犯': '#E91E63', '防災': '#FF9800', 'その他': '#9E9E9E', '写真スポット': '#FF69B4'
 };
 const STATUS_MAP = { published: '公開', hidden: '非公開', resolved: '対応済' };
 const ADMIN_STATUS_COLORS = { '投稿': '#9E9E9E', '受付': '#2196F3', '対応中': '#FF9800', '解決': '#4CAF50' };
@@ -375,7 +375,7 @@ body{font-family:-apple-system,'Hiragino Sans',sans-serif;color:#333;font-size:1
 <button style="background:#999" onclick="location.href='/admin'">戻る</button>
 </div>
 <div class="card">
-<div class="card-header"><h1>街の安全安心マップ - 投稿カード</h1>
+<div class="card-header"><h1>街の安全安心マップ plus - 投稿カード</h1>
 <div class="badges"><span class="badge" style="background:${color}">${esc(r.category)}</span>
 <span class="badge" style="background:${adminColor}">${esc(r.admin_status||'投稿')}</span></div></div>
 <div class="title">${esc(r.title)}</div>

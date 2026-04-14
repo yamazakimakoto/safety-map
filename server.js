@@ -56,7 +56,7 @@ async function main() {
   });
 
   app.listen(PORT, () => {
-    console.log(`街の安全安心マップ サーバー起動: http://localhost:${PORT}`);
+    console.log(`街の安全安心マップ plus サーバー起動: http://localhost:${PORT}`);
   });
 }
 

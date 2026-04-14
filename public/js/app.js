@@ -8,7 +8,8 @@ const CATEGORY_COLORS = {
   '交通・道路': '#2196F3',
   '防犯': '#E91E63',
   '防災': '#FF9800',
-  'その他': '#9E9E9E'
+  'その他': '#9E9E9E',
+  '写真スポット': '#FF69B4'
 };
 
 const STATUS_LABELS = {
@@ -151,7 +152,21 @@ function initMap() {
 }
 
 // カスタムマーカーアイコン
-function createIcon(color) {
+function createIcon(color, category) {
+  // 写真スポット専用：小さめの丸型カメラアイコン
+  if (category === '写真スポット') {
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="11" fill="#FF69B4" stroke="white" stroke-width="2"/>
+        <path d="M8 9.5h1l.5-1h5l.5 1h1a1 1 0 011 1v4a1 1 0 01-1 1H8a1 1 0 01-1-1v-4a1 1 0 011-1z" fill="none" stroke="white" stroke-width="1.2"/>
+        <circle cx="12" cy="12" r="1.8" fill="none" stroke="white" stroke-width="1.2"/>
+      </svg>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, -12]
+    });
+  }
   return L.divIcon({
     className: 'custom-marker',
     html: `<svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
@@ -199,7 +214,7 @@ function renderMarkers() {
   filtered.forEach(report => {
     const color = CATEGORY_COLORS[report.category] || '#9E9E9E';
     const marker = L.marker([report.latitude, report.longitude], {
-      icon: createIcon(color)
+      icon: createIcon(color, report.category)
     });
 
     // ポップアップ

@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const https = require('https');
 
-const VALID_CATEGORIES = ['環境', '交通・道路', '防犯', '防災', 'その他'];
+const VALID_CATEGORIES = ['環境', '交通・道路', '防犯', '防災', 'その他', '写真スポット'];
 const VALID_ADMIN_STATUSES = ['投稿', '受付', '対応中', '解決'];
 
 // 逆ジオコーディング（OpenStreetMap Nominatim）
