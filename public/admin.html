@@ -294,8 +294,12 @@
             <select id="editAdminStatus"><option value="投稿">投稿</option><option value="受付">受付</option><option value="対応中">対応中</option><option value="解決">解決</option></select>
           </div>
           <div class="form-group">
-            <label>管理メモ（最大2000字）</label>
-            <textarea id="editAdminMemo" rows="6" maxlength="2000" placeholder="対応状況や備考を記入..."></textarea>
+            <label>公開メモ（一般ユーザーに表示、最大2000字）</label>
+            <textarea id="editPublicMemo" rows="4" maxlength="2000" placeholder="投稿者・一般ユーザー向けの回答・対応状況..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>管理メモ（内部用・管理者のみ、最大2000字）</label>
+            <textarea id="editAdminMemo" rows="4" maxlength="2000" placeholder="内部用の管理メモ..."></textarea>
           </div>
           <button type="submit" class="btn btn-primary btn-block">更新する</button>
         </form>

@@ -149,6 +149,7 @@ function openEditFromData(id) {
   document.getElementById('editDescription').value = r.description || '';
   document.getElementById('editStatus').value = r.status;
   document.getElementById('editAdminStatus').value = r.admin_status || '投稿';
+  document.getElementById('editPublicMemo').value = r.public_memo || '';
   document.getElementById('editAdminMemo').value = r.admin_memo || '';
   document.getElementById('editModal').classList.remove('hidden');
 }
@@ -158,7 +159,7 @@ async function handleEditReport(e) {
   try {
     const res = await fetch(`/api/admin/reports/${document.getElementById('editId').value}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
-      body: JSON.stringify({ category: document.getElementById('editCategory').value, title: document.getElementById('editTitle').value, description: document.getElementById('editDescription').value, status: document.getElementById('editStatus').value, admin_status: document.getElementById('editAdminStatus').value, admin_memo: document.getElementById('editAdminMemo').value })
+      body: JSON.stringify({ category: document.getElementById('editCategory').value, title: document.getElementById('editTitle').value, description: document.getElementById('editDescription').value, status: document.getElementById('editStatus').value, admin_status: document.getElementById('editAdminStatus').value, admin_memo: document.getElementById('editAdminMemo').value, public_memo: document.getElementById('editPublicMemo').value })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -337,6 +338,7 @@ async function printReport(id) {
     if (r.photo2_url) photosHtml += `<img src="${r.photo2_url}" style="max-width:48%;max-height:200px;object-fit:cover;border-radius:6px;border:1px solid #ddd">`;
 
     const memoSummary = (r.admin_memo || '').substring(0, 300);
+    const publicMemoSummary = (r.public_memo || '').substring(0, 300);
     const mapEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${r.longitude-0.004}%2C${r.latitude-0.003}%2C${r.longitude+0.004}%2C${r.latitude+0.003}&layer=mapnik&marker=${r.latitude}%2C${r.longitude}`;
 
     // 新しいページで印刷カードを表示
@@ -383,7 +385,8 @@ ${r.address?`<div class="address">📍 ${esc(r.address)}</div>`:''}
 ${r.description?`<div class="desc">${esc(r.description)}</div>`:''}
 <div class="grid"><div class="map"><iframe src="${mapEmbedUrl}" frameborder="0" scrolling="no"></iframe></div>
 ${photosHtml?`<div class="photos">${photosHtml}</div>`:''}</div>
-${memoSummary?`<div class="memo"><h3>管理メモ</h3><p>${esc(memoSummary)}${r.admin_memo&&r.admin_memo.length>300?'...':''}</p></div>`:''}
+${publicMemoSummary?`<div class="memo" style="background:#e8f5e9;border-color:#c8e6c9"><h3 style="color:#2e7d32">公開メモ</h3><p>${esc(publicMemoSummary)}${r.public_memo&&r.public_memo.length>300?'...':''}</p></div>`:''}
+${memoSummary?`<div class="memo"><h3>管理メモ（内部）</h3><p>${esc(memoSummary)}${r.admin_memo&&r.admin_memo.length>300?'...':''}</p></div>`:''}
 <div class="meta">
 <div><b>投稿者:</b>${esc(r.author_name)}</div>
 <div><b>投稿日:</b>${fmtDate(r.created_at)}</div>

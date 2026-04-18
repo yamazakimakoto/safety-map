@@ -226,11 +226,16 @@ function renderMarkers() {
       photoHtml += `<img src="${escapeHtml(report.photo2_url)}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;margin-top:6px;margin-left:4px;">`;
     }
 
+    const hasMemoBadge = report.public_memo
+      ? `<span style="background:#4CAF50;color:white;padding:1px 8px;border-radius:10px;font-size:11px">💬 メモあり</span>`
+      : '';
+
     marker.bindPopup(`
       <div style="min-width:200px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
           <span style="background:${color};color:white;padding:1px 8px;border-radius:10px;font-size:11px">${escapeHtml(report.category)}</span>
           <span style="background:${ADMIN_STATUS_COLORS[report.admin_status] || '#9E9E9E'};color:white;padding:1px 8px;border-radius:10px;font-size:11px">${escapeHtml(report.admin_status || '投稿')}</span>
+          ${hasMemoBadge}
         </div>
         <strong style="font-size:14px">${escapeHtml(report.title)}</strong>
         ${report.description ? `<p style="font-size:13px;margin:6px 0;color:#555">${escapeHtml(report.description).substring(0, 100)}</p>` : ''}
@@ -273,6 +278,10 @@ function showReportDetail(id) {
     <h3 style="margin:12px 0 8px;font-size:18px">${escapeHtml(report.title)}</h3>
     ${report.address ? `<p style="font-size:13px;color:#888;margin-bottom:8px">📍 ${escapeHtml(report.address)}</p>` : ''}
     <p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px">${escapeHtml(report.description || '詳細なし')}</p>
+    ${report.public_memo ? `<div style="background:#e8f5e9;border-left:4px solid #4CAF50;padding:10px 12px;border-radius:4px;margin-bottom:16px">
+      <div style="font-size:12px;color:#2e7d32;font-weight:600;margin-bottom:4px">💬 運営からのメモ</div>
+      <div style="font-size:13px;color:#333;line-height:1.6;white-space:pre-wrap">${escapeHtml(report.public_memo)}</div>
+    </div>` : ''}
     ${photos}
     <div style="font-size:13px;color:#999;margin-top:12px;padding-top:12px;border-top:1px solid #e0e0e0">
       <div>投稿者: ${escapeHtml(report.author_name)}</div>
@@ -577,6 +586,7 @@ async function showMyPosts() {
           </div>
           <div class="report-card-title">${escapeHtml(r.title)}</div>
           <p style="font-size:13px;color:#666;margin:4px 0">${escapeHtml((r.description || '').substring(0, 100))}</p>
+          ${r.public_memo ? `<div style="background:#e8f5e9;border-left:3px solid #4CAF50;padding:6px 10px;border-radius:3px;margin:6px 0;font-size:12px"><strong style="color:#2e7d32">💬 運営メモ:</strong> ${escapeHtml(r.public_memo.substring(0, 100))}${r.public_memo.length > 100 ? '...' : ''}</div>` : ''}
           <div class="report-card-meta">投稿日: ${formatDate(r.created_at)} / 座標: ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</div>
           ${r.photo1_url || r.photo2_url ? `<div class="report-photos" style="margin-top:6px">${r.photo1_url ? `<img src="${escapeHtml(r.photo1_url)}">` : ''}${r.photo2_url ? `<img src="${escapeHtml(r.photo2_url)}">` : ''}</div>` : ''}
           <div style="margin-top:10px;display:flex;gap:8px">

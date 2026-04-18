@@ -67,6 +67,7 @@ const CREATE_TABLES = `
     status TEXT DEFAULT 'published',
     admin_status TEXT DEFAULT '投稿',
     admin_memo TEXT DEFAULT '',
+    public_memo TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES sm_users(id)
@@ -116,6 +117,7 @@ async function initDatabase() {
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN public_memo TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
@@ -144,6 +146,7 @@ async function initDatabase() {
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_status TEXT DEFAULT '投稿'"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_reports ADD COLUMN admin_memo TEXT DEFAULT ''"); } catch (e) {}
+    try { await db.exec("ALTER TABLE sm_reports ADD COLUMN public_memo TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN real_name TEXT DEFAULT ''"); } catch (e) {}
     try { await db.exec("ALTER TABLE sm_users ADD COLUMN address TEXT DEFAULT ''"); } catch (e) {}
