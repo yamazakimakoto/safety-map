@@ -73,6 +73,11 @@ const CREATE_TABLES = `
     FOREIGN KEY (user_id) REFERENCES sm_users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS sm_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS sm_admins (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,

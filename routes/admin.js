@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const sanitizeHtml = require('sanitize-html');
 const { adminAuth } = require('../middleware/auth');
 const { decryptEmail } = require('./auth');
-const { VALID_CATEGORIES, VALID_ADMIN_STATUSES, AREA_PRESETS, getAreaBounds, setArea } = require('./reports');
+const { VALID_CATEGORIES, VALID_ADMIN_STATUSES, AREA_PRESETS, getAreaBounds, saveArea } = require('./reports');
 
 function createAdminRoutes(db) {
   const router = express.Router();
@@ -322,17 +322,22 @@ function createAdminRoutes(db) {
     res.json({ area: getAreaBounds(), presets: AREA_PRESETS });
   });
 
-  router.put('/area', auth, (req, res) => {
-    const { preset, custom } = req.body;
-    if (preset && AREA_PRESETS[preset]) {
-      setArea(AREA_PRESETS[preset]);
-      return res.json({ message: `エリアを「${preset}」に変更しました`, area: getAreaBounds() });
+  router.put('/area', auth, async (req, res) => {
+    try {
+      const { preset, custom } = req.body;
+      if (preset && AREA_PRESETS[preset]) {
+        await saveArea(db, AREA_PRESETS[preset]);
+        return res.json({ message: `エリアを「${preset}」に変更しました`, area: getAreaBounds() });
+      }
+      if (custom && custom.name && custom.center && custom.minLat != null) {
+        await saveArea(db, custom);
+        return res.json({ message: `エリアを「${custom.name}」に変更しました`, area: getAreaBounds() });
+      }
+      res.status(400).json({ error: 'プリセット名またはカスタム設定を指定してください' });
+    } catch (error) {
+      console.error('エリア設定エラー:', error);
+      res.status(500).json({ error: 'サーバーエラーが発生しました' });
     }
-    if (custom && custom.name && custom.center && custom.minLat != null) {
-      setArea(custom);
-      return res.json({ message: `エリアを「${custom.name}」に変更しました`, area: getAreaBounds() });
-    }
-    res.status(400).json({ error: 'プリセット名またはカスタム設定を指定してください' });
   });
 
   // === データ初期化 ===

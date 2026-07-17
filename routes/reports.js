@@ -8,6 +8,11 @@ const fs = require('fs');
 const https = require('https');
 
 const VALID_CATEGORIES = ['環境', '交通・道路', '防犯', '防災', 'その他', '写真スポット'];
+
+// 公開APIが返すカラム（内部用の admin_memo・user_id は含めない）
+const PUBLIC_REPORT_COLS = `r.id, r.latitude, r.longitude, r.category, r.title, r.description,
+  r.address, r.photo1_url, r.photo2_url, r.status, r.admin_status, r.public_memo,
+  r.created_at, r.updated_at, u.display_name as author_name`;
 const VALID_ADMIN_STATUSES = ['投稿', '受付', '対応中', '解決'];
 
 // 逆ジオコーディング（OpenStreetMap Nominatim）
@@ -43,6 +48,28 @@ let currentArea = { ...AREA_PRESETS['戸塚区・泉区'] };
 
 function getAreaBounds() { return currentArea; }
 function setArea(area) { currentArea = { ...area }; }
+
+// 起動時にDBからエリア設定を復元（Renderの再起動でリセットされないように）
+async function loadArea(db) {
+  try {
+    const row = await db.get('SELECT value FROM sm_settings WHERE key = ?', ['area']);
+    if (row && row.value) {
+      const saved = JSON.parse(row.value);
+      if (saved && saved.name && saved.minLat != null) currentArea = saved;
+    }
+  } catch (e) {
+    console.error('エリア設定の読み込みエラー:', e);
+  }
+}
+
+// エリア変更をメモリとDBの両方に反映
+async function saveArea(db, area) {
+  currentArea = { ...area };
+  await db.run(
+    'INSERT INTO sm_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+    ['area', JSON.stringify(currentArea)]
+  );
+}
 
 function isWithinArea(lat, lng) {
   return lat >= currentArea.minLat && lat <= currentArea.maxLat &&
@@ -104,7 +131,7 @@ function createReportRoutes(db) {
   router.get('/', async (req, res) => {
     try {
       const { category } = req.query;
-      let sql = `SELECT r.*, u.display_name as author_name
+      let sql = `SELECT ${PUBLIC_REPORT_COLS}
                  FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
                  WHERE r.status = 'published'`;
       const params = [];
@@ -133,7 +160,7 @@ function createReportRoutes(db) {
       if (!user) return res.status(401).json({ error: '無効なセッションです' });
 
       const reports = await db.all(
-        `SELECT r.*, u.display_name as author_name FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
+        `SELECT ${PUBLIC_REPORT_COLS} FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
          WHERE r.user_id = ? ORDER BY r.created_at DESC`,
         [user.id]
       );
@@ -148,9 +175,9 @@ function createReportRoutes(db) {
   router.get('/:id', async (req, res) => {
     try {
       const report = await db.get(
-        `SELECT r.*, u.display_name as author_name
+        `SELECT ${PUBLIC_REPORT_COLS}
          FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
-         WHERE r.id = ?`,
+         WHERE r.id = ? AND r.status = 'published'`,
         [req.params.id]
       );
       if (!report) {
@@ -223,7 +250,7 @@ function createReportRoutes(db) {
       );
 
       const report = await db.get(
-        `SELECT r.*, u.display_name as author_name
+        `SELECT ${PUBLIC_REPORT_COLS}
          FROM sm_reports r JOIN sm_users u ON r.user_id = u.id
          WHERE r.id = ?`,
         [reportId]
@@ -296,7 +323,7 @@ function createReportRoutes(db) {
       await db.run(`UPDATE sm_reports SET ${updates.join(', ')} WHERE id = ?`, params);
 
       const updated = await db.get(
-        `SELECT r.*, u.display_name as author_name FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE r.id = ?`,
+        `SELECT ${PUBLIC_REPORT_COLS} FROM sm_reports r JOIN sm_users u ON r.user_id = u.id WHERE r.id = ?`,
         [req.params.id]
       );
       res.json({ message: '投稿を更新しました', report: updated });
@@ -328,4 +355,4 @@ function createReportRoutes(db) {
   return router;
 }
 
-module.exports = { createReportRoutes, VALID_CATEGORIES, VALID_ADMIN_STATUSES, AREA_PRESETS, getAreaBounds, setArea };
+module.exports = { createReportRoutes, VALID_CATEGORIES, VALID_ADMIN_STATUSES, AREA_PRESETS, getAreaBounds, setArea, loadArea, saveArea };

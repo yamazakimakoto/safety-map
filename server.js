@@ -9,15 +9,21 @@ const cors = require('cors');
 const path = require('path');
 const { initDatabase } = require('./database');
 const { createAuthRoutes } = require('./routes/auth');
-const { createReportRoutes } = require('./routes/reports');
+const { createReportRoutes, loadArea } = require('./routes/reports');
 const { createAdminRoutes } = require('./routes/admin');
 
 async function main() {
   const app = express();
   const PORT = process.env.PORT || 3000;
 
+  // Renderのリバースプロキシ配下で実クライアントIPを取得（レート制限が全員共有にならないように）
+  app.set('trust proxy', 1);
+
   // データベース初期化
   const db = await initDatabase();
+
+  // 保存済みエリア設定を復元
+  await loadArea(db);
 
   // セキュリティ（CSPは無効化 - Leaflet/OpenStreetMap互換性のため）
   app.use(helmet({
