@@ -279,9 +279,6 @@ function toggleAllBackup(checked) {
 
 function downloadBackup(type) {
   if (type === 'users') {
-    window.location.href = `/api/admin/backup/users?token=${adminToken}`;
-    // トークンをヘッダーで送れないのでクエリパラメータ方式にフォールバック
-    // 代わりにfetchでblobダウンロード
     fetchDownload(`/api/admin/backup/users`);
     return;
   }
